@@ -29,9 +29,14 @@
 
 #include "Magnum/GL/Buffer.h"
 #include "Magnum/GL/DefaultFramebuffer.h"
+#include "Magnum/GL/Framebuffer.h"
 #include "Magnum/GL/Mesh.h"
+#include "Magnum/GL/Renderbuffer.h"
+#include "Magnum/GL/RenderbufferFormat.h"
 #include "Magnum/GL/Texture.h"
 #include "Magnum/Math/Color.h"
+#include "Magnum/Math/Matrix3.h"
+#include "Magnum/Math/Matrix4.h"
 #include "Magnum/MeshTools/Duplicate.h"
 #include "Magnum/Shaders/DistanceFieldVector.h"
 #include "Magnum/Shaders/Flat.h"
@@ -161,7 +166,8 @@ mesh.addVertexBuffer(vertices, 0, Shaders::Flat3D::Position{})
 
 /* [Flat-usage-colored2] */
 Matrix4 transformationMatrix = Matrix4::translation(Vector3::zAxis(-5.0f));
-Matrix4 projectionMatrix = Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
+Matrix4 projectionMatrix =
+    Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
 
 Shaders::Flat3D shader;
 shader.setColor(0x2f83cc_rgbf)
@@ -204,6 +210,42 @@ mesh.draw(shader);
 /* [Flat-usage-textured2] */
 }
 
+#ifndef MAGNUM_TARGET_GLES2
+{
+GL::Framebuffer framebuffer{{}};
+GL::Mesh mesh;
+Vector2i size;
+UnsignedInt meshId{};
+/* [Flat-usage-object-id] */
+GL::Renderbuffer color, objectId;
+color.setStorage(GL::RenderbufferFormat::RGBA8, size);
+objectId.setStorage(GL::RenderbufferFormat::R16UI, size); // large as needed
+framebuffer.attachRenderbuffer(GL::Framebuffer::ColorAttachment{0}, color)
+    .attachRenderbuffer(GL::Framebuffer::ColorAttachment{1}, objectId);
+
+Shaders::Flat3D shader{Shaders::Flat3D::Flag::ObjectId};
+
+// ...
+
+framebuffer.mapForDraw({
+        {Shaders::Flat3D::ColorOutput, GL::Framebuffer::ColorAttachment{0}},
+        {Shaders::Flat3D::ObjectIdOutput, GL::Framebuffer::ColorAttachment{1}}})
+    .clearColor(0, 0x1f1f1f_rgbf)
+    .clearColor(1, Vector4ui{0})
+    .bind();
+
+shader.setObjectId(meshId);
+mesh.draw(shader);
+/* [Flat-usage-object-id] */
+
+/* [shaders-generic-object-id] */
+framebuffer.mapForDraw({
+    {Shaders::Generic3D::ColorOutput, GL::Framebuffer::ColorAttachment{0}},
+    {Shaders::Generic3D::ObjectIdOutput, GL::Framebuffer::ColorAttachment{1}}});
+/* [shaders-generic-object-id] */
+}
+#endif
+
 {
 /* [MeshVisualizer-usage-geom1] */
 struct Vertex {
@@ -222,7 +264,8 @@ mesh.addVertexBuffer(vertices, 0, Shaders::MeshVisualizer::Position{});
 
 /* [MeshVisualizer-usage-geom2] */
 Matrix4 transformationMatrix = Matrix4::translation(Vector3::zAxis(-5.0f));
-Matrix4 projectionMatrix = Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
+Matrix4 projectionMatrix =
+    Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
 
 Shaders::MeshVisualizer shader{Shaders::MeshVisualizer::Flag::Wireframe};
 shader.setColor(0x2f83cc_rgbf)
@@ -233,7 +276,7 @@ shader.setColor(0x2f83cc_rgbf)
 mesh.draw(shader);
 /* [MeshVisualizer-usage-geom2] */
 
-/* [MeshVisualizer-usage-no-geom-old1] */
+/* [MeshVisualizer-usage-no-geom-old] */
 Containers::Array<Float> vertexIndex{Containers::arraySize(data)};
 std::iota(vertexIndex.begin(), vertexIndex.end(), 0.0f);
 
@@ -241,27 +284,12 @@ GL::Buffer vertexIndices;
 vertexIndices.setData(vertexIndex, GL::BufferUsage::StaticDraw);
 
 mesh.addVertexBuffer(vertexIndices, 0, Shaders::MeshVisualizer::VertexIndex{});
-/* [MeshVisualizer-usage-no-geom-old1] */
+/* [MeshVisualizer-usage-no-geom-old] */
 }
 #endif
 
 {
-GL::Mesh mesh;
-/* [MeshVisualizer-usage-no-geom-old2] */
-Matrix4 transformationMatrix, projectionMatrix;
-
-Shaders::MeshVisualizer shader{Shaders::MeshVisualizer::Flag::Wireframe|
-                               Shaders::MeshVisualizer::Flag::NoGeometryShader};
-shader.setColor(0x2f83cc_rgbf)
-    .setWireframeColor(0xdcdcdc_rgbf)
-    .setTransformationProjectionMatrix(projectionMatrix*transformationMatrix);
-
-mesh.draw(shader);
-/* [MeshVisualizer-usage-no-geom-old2] */
-}
-
-{
-/* [MeshVisualizer-usage-no-geom] */
+/* [MeshVisualizer-usage-no-geom1] */
 std::vector<UnsignedInt> indices{
     // ...
 };
@@ -276,9 +304,23 @@ vertices.setData(MeshTools::duplicate(indices, indexedPositions),
 
 GL::Mesh mesh;
 mesh.addVertexBuffer(vertices, 0, Shaders::MeshVisualizer::Position{});
-/* [MeshVisualizer-usage-no-geom] */
+/* [MeshVisualizer-usage-no-geom1] */
 }
 
+{
+GL::Mesh mesh;
+/* [MeshVisualizer-usage-no-geom2] */
+Matrix4 transformationMatrix, projectionMatrix;
+
+Shaders::MeshVisualizer shader{Shaders::MeshVisualizer::Flag::Wireframe|
+                               Shaders::MeshVisualizer::Flag::NoGeometryShader};
+shader.setColor(0x2f83cc_rgbf)
+    .setWireframeColor(0xdcdcdc_rgbf)
+    .setTransformationProjectionMatrix(projectionMatrix*transformationMatrix);
+
+mesh.draw(shader);
+/* [MeshVisualizer-usage-no-geom2] */
+}
 #if !defined(__GNUC__) || defined(__clang__) || __GNUC__*100 + __GNUC_MINOR__ >= 500
 {
 /* [Phong-usage-colored1] */
@@ -301,7 +343,8 @@ mesh.addVertexBuffer(vertices, 0,
 
 /* [Phong-usage-colored2] */
 Matrix4 transformationMatrix = Matrix4::translation(Vector3::zAxis(-5.0f));
-Matrix4 projectionMatrix = Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
+Matrix4 projectionMatrix =
+    Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
 
 Shaders::Phong shader;
 shader.setDiffuseColor(0x2f83cc_rgbf)
@@ -420,7 +463,8 @@ mesh.addVertexBuffer(vertices, 0,
 
 /* [VertexColor-usage2] */
 Matrix4 transformationMatrix = Matrix4::translation(Vector3::zAxis(-5.0f));
-Matrix4 projectionMatrix = Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
+Matrix4 projectionMatrix =
+    Matrix4::perspectiveProjection(35.0_degf, 1.0f, 0.001f, 100.0f);
 
 Shaders::VertexColor3D shader;
 shader.setTransformationProjectionMatrix(projectionMatrix*transformationMatrix);

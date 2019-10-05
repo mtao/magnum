@@ -45,7 +45,7 @@ in highp vec4 position;
 #if defined(WIREFRAME_RENDERING) && defined(NO_GEOMETRY_SHADER)
 #if (!defined(GL_ES) && __VERSION__ < 140) || (defined(GL_ES) && __VERSION__ < 300)
 #ifdef EXPLICIT_ATTRIB_LOCATION
-layout(location = 3)
+layout(location = 5)
 #endif
 in lowp float vertexIndex;
 #define gl_VertexID int(vertexIndex)
@@ -61,7 +61,11 @@ void main() {
     barycentric = vec3(0.0);
 
     #ifdef SUBSCRIPTING_WORKAROUND
+    #ifndef NEW_GLSL
     int i = int(mod(vertexIndex, 3.0));
+    #else
+    int i = gl_VertexID % 3;
+    #endif
          if(i == 0) barycentric.x = 1.0;
     else if(i == 1) barycentric.y = 1.0;
     else            barycentric.z = 1.0;

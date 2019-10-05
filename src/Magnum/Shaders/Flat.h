@@ -31,9 +31,6 @@
 
 #include "Magnum/DimensionTraits.h"
 #include "Magnum/GL/AbstractShaderProgram.h"
-#include "Magnum/Math/Color.h"
-#include "Magnum/Math/Matrix3.h"
-#include "Magnum/Math/Matrix4.h"
 #include "Magnum/Shaders/Generic.h"
 #include "Magnum/Shaders/visibility.h"
 
@@ -42,7 +39,11 @@ namespace Magnum { namespace Shaders {
 namespace Implementation {
     enum class FlatFlag: UnsignedByte {
         Textured = 1 << 0,
-        AlphaMask = 1 << 1
+        AlphaMask = 1 << 1,
+        VertexColor = 1 << 2,
+        #ifndef MAGNUM_TARGET_GLES2
+        ObjectId = 1 << 3
+        #endif
     };
     typedef Containers::EnumSet<FlatFlag> FlatFlags;
 }
@@ -56,14 +57,20 @@ shader renders the mesh with a white color in an identity transformation.
 Use @ref setTransformationProjectionMatrix(), @ref setColor() and others to
 configure the shader.
 
-If you want to use a texture, you need to provide also @ref TextureCoordinates
-attribute. Pass @ref Flag::Textured to the constructor and then at render time
-don't forget to bind also the texture via @ref bindTexture(). The texture is
-multipled by the color, which is by default set to @cpp 0xffffffff_rgbaf @ce.
-
-For coloring the texture based on intensity you can use the @ref Vector shader.
+If you want to use a texture, you need to provide also the
+@ref TextureCoordinates attribute. Pass @ref Flag::Textured to the constructor
+and then at render time don't forget to bind also the texture via
+@ref bindTexture(). The texture is multipled by the color, which is by default
+set to @cpp 0xffffffff_rgbaf @ce.
 
 @image html shaders-flat.png width=256px
+
+For coloring the texture based on intensity you can use the @ref Vector shader.
+The 3D version of this shader is equivalent to @ref Phong with zero lights,
+however this implementation is much simpler and thus likely also faster. See
+@ref Shaders-Phong-zero-lights "its documentation" for more information.
+Conversely, enabling @ref Flag::VertexColor and using a default color with no
+texturing makes this shader equivalent to @ref VertexColor.
 
 @section Shaders-Flat-usage Example usage
 
@@ -96,6 +103,20 @@ operation which is known to have considerable performance impact on some
 platforms. With proper depth sorting and blending you'll usually get much
 better performance and output quality.
 
+@subsection Shaders-Flat-usage-object-id Object ID output
+
+The shader supports writing object ID to the framebuffer for object picking or
+other annotation purposes. Enable it using @ref Flag::ObjectId and set up an
+integer buffer attached to the @ref ObjectIdOutput attachment. Note that for
+portability you should use @ref GL::Framebuffer::clearColor() instead of
+@ref GL::Framebuffer::clear() as the former usually emits GL errors when called
+on framebuffers with integer attachments.
+
+@snippet MagnumShaders.cpp Flat-usage-object-id
+
+@requires_gles30 Object ID output requires integer buffer attachments, which
+    are not available in OpenGL ES 2.0 or WebGL 1.0.
+
 @see @ref shaders, @ref Flat2D, @ref Flat3D
 */
 template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::AbstractShaderProgram {
@@ -117,6 +138,46 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::Ab
          * set.
          */
         typedef typename Generic<dimensions>::TextureCoordinates TextureCoordinates;
+
+        /**
+         * @brief Three-component vertex color
+         *
+         * @ref shaders-generic "Generic attribute", @ref Magnum::Color3. Use
+         * either this or the @ref Color4 attribute. Used only if
+         * @ref Flag::VertexColor is set.
+         */
+        typedef typename Generic<dimensions>::Color3 Color3;
+
+        /**
+         * @brief Four-component vertex color
+         *
+         * @ref shaders-generic "Generic attribute", @ref Magnum::Color4. Use
+         * either this or the @ref Color3 attribute. Used only if
+         * @ref Flag::VertexColor is set.
+         */
+        typedef typename Generic<dimensions>::Color4 Color4;
+
+        enum: UnsignedInt {
+            /**
+             * Color shader output. Present always, expects three- or
+             * four-component floating-point or normalized buffer attachment.
+             */
+            ColorOutput = Generic<dimensions>::ColorOutput,
+
+            #ifndef MAGNUM_TARGET_GLES2
+            /**
+             * Object ID shader output. @ref shaders-generic "Generic output",
+             * present only if @ref Flag::ObjectId is set. Expects a
+             * single-component unsigned integral attachment. Writes the value
+             * set in @ref setObjectId() there, see
+             * @ref Shaders-Phong-usage-object-id for more information.
+             * @requires_gles30 Object ID output requires integer buffer
+             *      attachments, which are not available in OpenGL ES 2.0 or
+             *      WebGL 1.0.
+             */
+            ObjectIdOutput = Generic<dimensions>::ObjectIdOutput
+            #endif
+        };
 
         #ifdef DOXYGEN_GENERATING_OUTPUT
         /**
@@ -142,7 +203,24 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::Ab
              * with proper depth sorting and blending you'll usually get much
              * better performance and output quality.
              */
-            AlphaMask = 1 << 1
+            AlphaMask = 1 << 1,
+
+            /**
+             * Multiply diffuse color with a vertex color. Requires either
+             * the @ref Color3 or @ref Color4 attribute to be present.
+             */
+            VertexColor = 1 << 2,
+
+            #ifndef MAGNUM_TARGET_GLES2
+            /**
+             * Enable object ID output. See @ref Shaders-Flat-usage-object-id
+             * for more information.
+             * @requires_gles30 Object ID output requires integer buffer
+             *      attachments, which are not available in OpenGL ES 2.0 or
+             *      WebGL 1.0.
+             */
+            ObjectId = 1 << 3
+            #endif
         };
 
         /**
@@ -167,7 +245,7 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::Ab
         /**
          * @brief Construct without creating the underlying OpenGL object
          *
-         * The constructed instance is equivalent to moved-from state. Useful
+         * The constructed instance is equivalent to a moved-from state. Useful
          * in cases where you will overwrite the instance later anyway. Move
          * another object over it to make it useful.
          *
@@ -197,24 +275,18 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::Ab
          *
          * Initial value is an identity matrix.
          */
-        Flat<dimensions>& setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix) {
-            setUniform(_transformationProjectionMatrixUniform, matrix);
-            return *this;
-        }
+        Flat<dimensions>& setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix);
 
         /**
          * @brief Set color
          * @return Reference to self (for method chaining)
          *
          * If @ref Flag::Textured is set, initial value is
-         * @cpp 0xffffffff_rgbaf @ce and the color will be multiplied with
+         * @cpp 0xffffffff_rgbaf @ce and the color will be multiplied with the
          * texture.
          * @see @ref bindTexture()
          */
-        Flat<dimensions>& setColor(const Color4& color){
-            setUniform(_colorUniform, color);
-            return *this;
-        }
+        Flat<dimensions>& setColor(const Magnum::Color4& color);
 
         /**
          * @brief Bind a color texture
@@ -237,6 +309,22 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::Ab
          */
         Flat<dimensions>& setAlphaMask(Float mask);
 
+        #ifndef MAGNUM_TARGET_GLES2
+        /**
+         * @brief Set object ID
+         * @return Reference to self (for method chaining)
+         *
+         * Expects that the shader was created with @ref Flag::ObjectId
+         * enabled. Value set here is written to the @ref ObjectIdOutput, see
+         * @ref Shaders-Flat-usage-object-id for more information. Default is
+         * @cpp 0 @ce.
+         * @requires_gles30 Object ID output requires integer buffer
+         *      attachments, which are not available in OpenGL ES 2.0 or WebGL
+         *      1.0.
+         */
+        Flat<dimensions>& setObjectId(UnsignedInt id);
+        #endif
+
         #ifdef MAGNUM_BUILD_DEPRECATED
         /** @brief @copybrief bindTexture()
          * @deprecated Use @ref bindTexture() instead.
@@ -251,6 +339,9 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Flat: public GL::Ab
         Int _transformationProjectionMatrixUniform{0},
             _colorUniform{1},
             _alphaMaskUniform{2};
+        #ifndef MAGNUM_TARGET_GLES2
+        Int _objectIdUniform{3};
+        #endif
 };
 
 /** @brief 2D flat shader */

@@ -26,7 +26,7 @@
 */
 
 /** @file
- * @brief Class @ref Magnum::ImageView, @ref Magnum::CompressedImageView, typedef @ref Magnum::ImageView1D, @ref Magnum::ImageView2D, @ref Magnum::ImageView3D, @ref Magnum::CompressedImageView1D, @ref Magnum::CompressedImageView2D, @ref Magnum::CompressedImageView3D
+ * @brief Class @ref Magnum::ImageView, @ref Magnum::CompressedImageView, alias @ref Magnum::BasicImageView, @ref Magnum::BasicCompressedImageView, typedef @ref Magnum::ImageView1D, @ref Magnum::ImageView2D, @ref Magnum::ImageView3D, @ref Magnum::MutableImageView1D, @ref Magnum::MutableImageView2D, @ref Magnum::MutableImageView3D, @ref Magnum::CompressedImageView1D, @ref Magnum::CompressedImageView2D, @ref Magnum::CompressedImageView3D, @ref Magnum::MutableCompressedImageView1D, @ref Magnum::MutableCompressedImageView2D, @ref Magnum::MutableCompressedImageView3D
  */
 
 #include <Corrade/Containers/ArrayView.h>
@@ -78,6 +78,17 @@ sub-rectangle of a 75x75 8-bit RGB image , with rows aligned to four bytes:
 
 @snippet Magnum.cpp ImageView-usage-storage
 
+@section ImageView-mutable Data mutability
+
+When using types derived from @ref BasicImageView (e.g. @ref ImageView2D), the
+viewed data are immutable. This is the most common use case. In order to be
+able to mutate the underlying data (for example in order to read into a
+pre-allocated memory), use @ref BasicMutableImageView
+(e.g. @ref MutableImageView2D) instead. @ref Image and @ref Trade::ImageData
+are convertible to either of these. Similarly to
+@ref Corrade::Containers::ArrayView etc., a mutable view is also implicitly
+convertible to a const one.
+
 @subsection ImageView-usage-implementation-specific Implementation-specific formats
 
 For known graphics APIs, there's a set of utility functions converting from
@@ -113,11 +124,32 @@ Metal-specific format identifier:
 
 @snippet Magnum.cpp ImageView-usage-metal
 
-@see @ref ImageView1D, @ref ImageView2D, @ref ImageView3D,
-    @ref Image-pixel-views
+@see @ref BasicImageView, @ref ImageView1D, @ref ImageView2D, @ref ImageView3D,
+    @ref BasicMutableImageView, @ref MutableImageView1D,
+    @ref MutableImageView2D, @ref MutableImageView3D, @ref Image-pixel-views
 */
-template<UnsignedInt dimensions> class ImageView {
+template<UnsignedInt dimensions, class T> class ImageView {
     public:
+        /* Pointer arithmetic relies on the type being a single byte */
+        static_assert(std::is_same<T, char>::value ||std::is_same<T, const char>::value,
+            "image view type can be either char or const char");
+
+        /**
+         * @brief Raw data type
+         *
+         * @cpp const char @ce for @ref BasicImageView and @cpp char @ce for
+         * @ref BasicMutableImageView. See also @ref ErasedType.
+         */
+        typedef T Type;
+
+        /**
+         * @brief Erased data type
+         *
+         * @cpp const void @ce for @ref BasicImageView and @cpp const void @ce
+         * for @ref BasicMutableImageView. See also @ref Type.
+         */
+        typedef typename std::conditional<std::is_const<T>::value, const void, void>::type ErasedType;
+
         enum: UnsignedInt {
             Dimensions = dimensions /**< Image dimension count */
         };
@@ -132,7 +164,7 @@ template<UnsignedInt dimensions> class ImageView {
          * The @p data array is expected to be of proper size for given
          * parameters.
          */
-        explicit ImageView(PixelStorage storage, PixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        explicit ImageView(PixelStorage storage, PixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /**
          * @brief Constructor
@@ -140,10 +172,10 @@ template<UnsignedInt dimensions> class ImageView {
          * @param size              Image size
          * @param data              Image data
          *
-         * Equivalent to calling @ref ImageView(PixelStorage, PixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * Equivalent to calling @ref ImageView(PixelStorage, PixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with default-constructed @ref PixelStorage.
          */
-        explicit ImageView(PixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept: ImageView{{}, format, size, data} {}
+        explicit ImageView(PixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept: ImageView{{}, format, size, data} {}
 
         /**
          * @brief Construct an empty view
@@ -175,7 +207,7 @@ template<UnsignedInt dimensions> class ImageView {
          * @param size              Image size
          * @param data              Image data
          *
-         * Unlike with @ref ImageView(PixelStorage, PixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>),
+         * Unlike with @ref ImageView(PixelStorage, PixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>),
          * where pixel size is calculated automatically using
          * @ref pixelSize(PixelFormat), this allows you to specify an
          * implementation-specific pixel format and pixel size directly. Uses
@@ -185,14 +217,14 @@ template<UnsignedInt dimensions> class ImageView {
          * The @p data array is expected to be of proper size for given
          * parameters.
          */
-        explicit ImageView(PixelStorage storage, UnsignedInt format, UnsignedInt formatExtra, UnsignedInt pixelSize, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        explicit ImageView(PixelStorage storage, UnsignedInt format, UnsignedInt formatExtra, UnsignedInt pixelSize, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /** @overload
          *
          * Equivalent to the above for @p format already wrapped with
          * @ref pixelFormatWrap().
          */
-        explicit ImageView(PixelStorage storage, PixelFormat format, UnsignedInt formatExtra, UnsignedInt pixelSize, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        explicit ImageView(PixelStorage storage, PixelFormat format, UnsignedInt formatExtra, UnsignedInt pixelSize, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /**
          * @brief Construct an empty view with implementation-specific pixel format
@@ -230,10 +262,10 @@ template<UnsignedInt dimensions> class ImageView {
          * @param data              Image data
          *
          * Uses ADL to find a corresponding @cpp pixelSize(T, U) @ce overload,
-         * then calls @ref ImageView(PixelStorage, UnsignedInt, UnsignedInt, UnsignedInt, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * then calls @ref ImageView(PixelStorage, UnsignedInt, UnsignedInt, UnsignedInt, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with calculated pixel size.
          */
-        template<class T, class U> explicit ImageView(PixelStorage storage, T format, U formatExtra, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        template<class U, class V> explicit ImageView(PixelStorage storage, U format, V formatExtra, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /**
          * @brief Construct an image view with implementation-specific pixel format
@@ -243,10 +275,10 @@ template<UnsignedInt dimensions> class ImageView {
          * @param data              Image data
          *
          * Uses ADL to find a corresponding @cpp pixelSize(T) @ce overload,
-         * then calls @ref ImageView(PixelStorage, UnsignedInt, UnsignedInt, UnsignedInt, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * then calls @ref ImageView(PixelStorage, UnsignedInt, UnsignedInt, UnsignedInt, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with calculated pixel size and @p formatExtra set to @cpp 0 @ce.
          */
-        template<class T> explicit ImageView(PixelStorage storage, T format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        template<class U> explicit ImageView(PixelStorage storage, U format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /**
          * @brief Construct an image view with implementation-specific pixel format
@@ -255,10 +287,10 @@ template<UnsignedInt dimensions> class ImageView {
          * @param size              Image size
          * @param data              Image data
          *
-         * Equivalent to calling @ref ImageView(PixelStorage, T, U, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * Equivalent to calling @ref ImageView(PixelStorage, U, V, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with default-constructed @ref PixelStorage.
          */
-        template<class T, class U> explicit ImageView(T format, U formatExtra, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept: ImageView{{}, format, formatExtra, size, data} {}
+        template<class U, class V> explicit ImageView(U format, V formatExtra, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept: ImageView{{}, format, formatExtra, size, data} {}
 
         /**
          * @brief Construct an image view with implementation-specific pixel format
@@ -266,10 +298,10 @@ template<UnsignedInt dimensions> class ImageView {
          * @param size              Image size
          * @param data              Image data
          *
-         * Equivalent to calling @ref ImageView(PixelStorage, T, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * Equivalent to calling @ref ImageView(PixelStorage, U, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with default-constructed @ref PixelStorage.
          */
-        template<class T> explicit ImageView(T format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept: ImageView{{}, format, size, data} {}
+        template<class U> explicit ImageView(U format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept: ImageView{{}, format, size, data} {}
 
         /**
          * @brief Construct an empty view with implementation-specific pixel format
@@ -285,7 +317,7 @@ template<UnsignedInt dimensions> class ImageView {
          * Data pointer is set to @cpp nullptr @ce, call @ref setData() to
          * assign a memory view to the image.
          */
-        template<class T, class U> explicit ImageView(PixelStorage storage, T format, U formatExtra, const VectorTypeFor<dimensions, Int>& size) noexcept;
+        template<class U, class V> explicit ImageView(PixelStorage storage, U format, V formatExtra, const VectorTypeFor<dimensions, Int>& size) noexcept;
 
         /**
          * @brief Construct an empty view with implementation-specific pixel format
@@ -300,7 +332,7 @@ template<UnsignedInt dimensions> class ImageView {
          * Data pointer is set to @cpp nullptr @ce, call @ref setData() to
          * assign a memory view to the image.
          */
-        template<class T> explicit ImageView(PixelStorage storage, T format, const VectorTypeFor<dimensions, Int>& size) noexcept;
+        template<class U> explicit ImageView(PixelStorage storage, U format, const VectorTypeFor<dimensions, Int>& size) noexcept;
 
         /**
          * @brief Construct an empty view with implementation-specific pixel format
@@ -308,20 +340,26 @@ template<UnsignedInt dimensions> class ImageView {
          * @param formatExtra       Additional pixel format specifier
          * @param size              Image size
          *
-         * Equivalent to calling @ref ImageView(PixelStorage, T, U, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * Equivalent to calling @ref ImageView(PixelStorage, U, V, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with default-constructed @ref PixelStorage.
          */
-        template<class T, class U> explicit ImageView(T format, U formatExtra, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{{}, format, formatExtra, size} {}
+        template<class U, class V> explicit ImageView(U format, V formatExtra, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{{}, format, formatExtra, size} {}
 
         /**
          * @brief Construct an empty view with implementation-specific pixel format
          * @param format            Format of pixel data
          * @param size              Image size
          *
-         * Equivalent to calling @ref ImageView(PixelStorage, T, const VectorTypeFor<dimensions, Int>&)
+         * Equivalent to calling @ref ImageView(PixelStorage, U, const VectorTypeFor<dimensions, Int>&)
          * with default-constructed @ref PixelStorage.
          */
-        template<class T> explicit ImageView(T format, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{{}, format, size} {}
+        template<class U> explicit ImageView(U format, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{{}, format, size} {}
+
+        /** @brief Construct from a view of lower dimension count */
+        template<UnsignedInt otherDimensions, class = typename std::enable_if<(otherDimensions < dimensions)>::type> /*implicit*/ ImageView(const ImageView<otherDimensions, T>& other) noexcept;
+
+        /** @brief Convert a mutable view to a const one */
+        template<class U, class = typename std::enable_if<std::is_const<T>::value &&!std::is_const<U>::value>::type> /*implicit*/ ImageView(const ImageView<dimensions, U>& other) noexcept;
 
         /** @brief Storage of pixel data */
         PixelStorage storage() const { return _storage; }
@@ -362,21 +400,26 @@ template<UnsignedInt dimensions> class ImageView {
          *
          * See @ref PixelStorage::dataProperties() for more information.
          */
-        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const {
-            return Implementation::imageDataProperties<dimensions>(*this);
-        }
+        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const;
 
         /**
          * @brief Image data
          *
          * @see @ref pixels()
          */
-        Containers::ArrayView<const char> data() const { return _data; }
+        Containers::ArrayView<Type> data() const { return _data; }
 
-        /** @overload */
-        template<class T> const T* data() const {
-            return reinterpret_cast<const T*>(_data.data());
+        #ifdef MAGNUM_BUILD_DEPRECATED
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class U> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") const U* data() const {
+            return reinterpret_cast<const U*>(_data.data());
         }
+        #endif
 
         /**
          * @brief Set image data
@@ -384,15 +427,17 @@ template<UnsignedInt dimensions> class ImageView {
          * The data array is expected to be of proper size for parameters
          * specified in the constructor.
          */
-        void setData(Containers::ArrayView<const void> data);
+        void setData(Containers::ArrayView<ErasedType> data);
 
         /**
          * @brief View on pixel data
          *
          * Provides direct and easy-to-use access to image pixels. See
-         * @ref Image-pixel-views for more information.
+         * @ref Image-pixel-views for more information. If the view is empty
+         * (with @ref data() being @cpp nullptr @ce), returns @cpp nullptr @ce
+         * as well.
          */
-        Containers::StridedArrayView<dimensions + 1, const char> pixels() const;
+        Containers::StridedArrayView<dimensions + 1, Type> pixels() const;
 
         /**
          * @brief View on pixel data with a concrete pixel type
@@ -400,31 +445,90 @@ template<UnsignedInt dimensions> class ImageView {
          * Compared to non-templated @ref pixels() in addition casts the pixel
          * data to a specified type. The user is responsible for choosing
          * correct type for given @ref format() --- checking it on the library
-         * side is not possible for the general case.
+         * side is not possible for the general case. If the view is empty
+         * (with @ref data() being @cpp nullptr @ce), returns @cpp nullptr @ce
+         * as well.
          */
-        template<class T> Containers::StridedArrayView<dimensions, const T> pixels() const {
+        template<class U> Containers::StridedArrayView<dimensions, typename std::conditional<std::is_const<Type>::value, typename std::add_const<U>::type, U>::type> pixels() const {
+            if(!_data && !_data.size()) return {};
             /* Deliberately not adding a StridedArrayView include, it should
                work without since this is a templated function */
-            return Containers::arrayCast<dimensions, const T>(pixels());
+            return Containers::arrayCast<dimensions, typename std::conditional<std::is_const<Type>::value, typename std::add_const<U>::type, U>::type>(pixels());
         }
 
     private:
+        /* Needed for mutable->const conversion */
+        template<UnsignedInt, class> friend class ImageView;
+
         PixelStorage _storage;
         PixelFormat _format;
         UnsignedInt _formatExtra;
         UnsignedInt _pixelSize;
         Math::Vector<Dimensions, Int> _size;
-        Containers::ArrayView<const char> _data;
+        Containers::ArrayView<Type> _data;
 };
 
-/** @brief One-dimensional image view */
-typedef ImageView<1> ImageView1D;
+/**
+@brief Const image view
 
-/** @brief Two-dimensional image view */
-typedef ImageView<2> ImageView2D;
+@see @ref ImageView1D, @ref ImageView2D, @ref ImageView3D,
+    @ref BasicMutableImageView
+*/
+#ifndef CORRADE_MSVC2015_COMPATIBILITY /* Multiple definitions still broken */
+template<UnsignedInt dimensions> using BasicImageView = ImageView<dimensions, const char>;
+#endif
 
-/** @brief Three-dimensional image view */
-typedef ImageView<3> ImageView3D;
+/**
+@brief One-dimensional image view
+
+@see @ref MutableImageView1D, @ref CompressedImageView1D, @ref ImageView
+*/
+typedef BasicImageView<1> ImageView1D;
+
+/**
+@brief Two-dimensional image view
+
+@see @ref MutableImageView2D, @ref CompressedImageView2D, @ref ImageView
+*/
+typedef BasicImageView<2> ImageView2D;
+
+/**
+@brief Three-dimensional image view
+
+@see @ref MutableImageView3D, @ref CompressedImageView3D, @ref ImageView
+*/
+typedef BasicImageView<3> ImageView3D;
+
+/**
+@brief Mutable image view
+
+@see @ref MutableImageView1D, @ref MutableImageView2D, @ref MutableImageView3D,
+    @ref BasicImageView
+*/
+#ifndef CORRADE_MSVC2015_COMPATIBILITY /* Multiple definitions still broken */
+template<UnsignedInt dimensions> using BasicMutableImageView = ImageView<dimensions, char>;
+#endif
+
+/**
+@brief One-dimensional mutable image view
+
+@see @ref ImageView1D, @ref MutableCompressedImageView1D, @ref ImageView
+*/
+typedef BasicMutableImageView<1> MutableImageView1D;
+
+/**
+@brief Two-dimensional mutable image view
+
+@see @ref ImageView2D, @ref MutableCompressedImageView2D, @ref ImageView
+*/
+typedef BasicMutableImageView<2> MutableImageView2D;
+
+/**
+@brief Three-dimensional mutable image view
+
+@see @ref ImageView3D, @ref MutableCompressedImageView3D, @ref ImageView
+*/
+typedef BasicMutableImageView<3> MutableImageView3D;
 
 /**
 @brief Compressed image view
@@ -462,6 +566,17 @@ as first parameter. In the following snippet, the view is the bottom-right
 
 @snippet Magnum.cpp CompressedImageView-usage-storage
 
+@section CompressedImageView-mutable Data mutability
+
+When using types derived from @ref BasicCompressedImageView (e.g.
+@ref CompressedImageView2D), the viewed data are immutable. This is the most
+common use case. In order to be able to mutate the underlying data (for example
+in order to read into a pre-allocated memory), use
+@ref BasicMutableCompressedImageView (e.g. @ref MutableCompressedImageView2D)
+instead. @ref CompressedImage and @ref Trade::ImageData are convertible to
+either of these. Similarly to @ref Corrade::Containers::ArrayView etc., a
+mutable view is also implicitly convertible to a const one.
+
 @subsection CompressedImageView-usage-implementation-specific Implementation-specific formats
 
 For known graphics APIs, there's a set of utility functions converting from
@@ -487,10 +602,37 @@ extract the implementation-specific identifier using
 @snippet Magnum.cpp CompressedImageView-usage-gl-extract
 
 @see @ref CompressedImageView1D, @ref CompressedImageView2D,
-    @ref CompressedImageView3D
+    @ref CompressedImageView3D, @ref MutableCompressedImageView1D,
+    @ref MutableCompressedImageView2D, @ref MutableCompressedImageView3D
 */
-template<UnsignedInt dimensions> class CompressedImageView {
+template<UnsignedInt dimensions, class T> class CompressedImageView {
     public:
+        /* Pointer arithmetic relies on the type being a single byte */
+        static_assert(std::is_same<T, char>::value ||std::is_same<T, const char>::value,
+            "image view type can be either char or const char");
+
+        /**
+         * @brief Raw data type
+         *
+         * @cpp const char @ce for @ref CompressedImageView1D /
+         * @ref CompressedImageView2D / @ref CompressedImageView3D and
+         * @cpp char @ce for @ref MutableCompressedImageView1D /
+         * @ref MutableCompressedImageView2D /
+         * @ref MutableCompressedImageView3D. See also @ref ErasedType.
+         */
+        typedef T Type;
+
+        /**
+         * @brief Erased data type
+         *
+         * @cpp const void @ce for @ref CompressedImageView1D /
+         * @ref CompressedImageView2D / @ref CompressedImageView3D and
+         * @cpp const void @ce for @ref MutableCompressedImageView1D /
+         * @ref MutableCompressedImageView2D / @ref MutableCompressedImageView3D.
+         * See also @ref Type.
+         */
+        typedef typename std::conditional<std::is_const<T>::value, const void, void>::type ErasedType;
+
         enum: UnsignedInt {
             Dimensions = dimensions /**< Image dimension count */
         };
@@ -502,7 +644,7 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * @param size              Image size
          * @param data              Image data
          */
-        explicit CompressedImageView(CompressedPixelStorage storage, CompressedPixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        explicit CompressedImageView(CompressedPixelStorage storage, CompressedPixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /**
          * @brief Constructor
@@ -510,10 +652,10 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * @param size              Image size
          * @param data              Image data
          *
-         * Equivalent to calling @ref CompressedImageView(CompressedPixelStorage, CompressedPixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * Equivalent to calling @ref CompressedImageView(CompressedPixelStorage, CompressedPixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with default-constructed @ref CompressedPixelStorage.
          */
-        explicit CompressedImageView(CompressedPixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept: CompressedImageView{{}, format, size, data} {}
+        explicit CompressedImageView(CompressedPixelFormat format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept: CompressedImageView{{}, format, size, data} {}
 
         /**
          * @brief Construct an empty view
@@ -546,7 +688,7 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * Uses @ref compressedPixelFormatWrap() internally to convert
          * @p format to @ref CompressedPixelFormat.
          */
-        template<class T> explicit CompressedImageView(CompressedPixelStorage storage, T format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        template<class U> explicit CompressedImageView(CompressedPixelStorage storage, U format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
 
         /**
          * @brief Construct an image view with implementation-specific format
@@ -554,10 +696,10 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * @param size              Image size
          * @param data              Image data
          *
-         * Equivalent to calling @ref CompressedImageView(CompressedPixelStorage, CompressedPixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<const void>)
+         * Equivalent to calling @ref CompressedImageView(CompressedPixelStorage, CompressedPixelFormat, const VectorTypeFor<dimensions, Int>&, Containers::ArrayView<ErasedType>)
          * with default-constructed @ref CompressedPixelStorage.
          */
-        template<class T> explicit CompressedImageView(T format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept: CompressedImageView{{}, format, size, data} {}
+        template<class U> explicit CompressedImageView(U format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept: CompressedImageView{{}, format, size, data} {}
 
         /**
          * @brief Construct an empty view with implementation-specific format
@@ -570,7 +712,7 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * @cpp nullptr @ce, call @ref setData() to assign a memory view to the
          * image.
          */
-        template<class T> explicit CompressedImageView(CompressedPixelStorage storage, T format, const VectorTypeFor<dimensions, Int>& size) noexcept;
+        template<class U> explicit CompressedImageView(CompressedPixelStorage storage, U format, const VectorTypeFor<dimensions, Int>& size) noexcept;
 
         /**
          * @brief Construct an empty view with implementation-specific format
@@ -580,7 +722,13 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * Equivalent to calling @ref CompressedImageView(CompressedPixelStorage, CompressedPixelFormat, const VectorTypeFor<dimensions, Int>&)
          * with default-constructed @ref CompressedPixelStorage.
          */
-        template<class T> explicit CompressedImageView(T format, const VectorTypeFor<dimensions, Int>& size) noexcept: CompressedImageView{{}, format, size} {}
+        template<class U> explicit CompressedImageView(U format, const VectorTypeFor<dimensions, Int>& size) noexcept: CompressedImageView{{}, format, size} {}
+
+        /** @brief Construct from a view of lower dimension count */
+        template<UnsignedInt otherDimensions, class = typename std::enable_if<(otherDimensions < dimensions)>::type> /*implicit*/ CompressedImageView(const CompressedImageView<otherDimensions, T>& other) noexcept;
+
+        /** @brief Convert a mutable view to a const one */
+        template<class U, class = typename std::enable_if<std::is_const<T>::value &&!std::is_const<U>::value>::type> /*implicit*/ CompressedImageView(const CompressedImageView<dimensions, U>& other) noexcept;
 
         /** @brief Storage of compressed pixel data */
         CompressedPixelStorage storage() const { return _storage; }
@@ -605,17 +753,22 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * See @ref CompressedPixelStorage::dataProperties() for more
          * information.
          */
-        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const {
-            return Implementation::compressedImageDataProperties<dimensions>(*this);
-        }
+        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const;
 
         /** @brief Image data */
-        Containers::ArrayView<const char> data() const { return _data; }
+        Containers::ArrayView<Type> data() const { return _data; }
 
-        /** @overload */
-        template<class T> const T* data() const {
-            return reinterpret_cast<const T*>(_data.data());
+        #ifdef MAGNUM_BUILD_DEPRECATED
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class U> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") const U* data() const {
+            return reinterpret_cast<const U*>(_data.data());
         }
+        #endif
 
         /**
          * @brief Set image data
@@ -623,70 +776,134 @@ template<UnsignedInt dimensions> class CompressedImageView {
          * The data array is expected to be of proper size for parameters
          * specified in the constructor.
          */
-        void setData(Containers::ArrayView<const void> data) {
-            _data = {reinterpret_cast<const char*>(data.data()), data.size()};
+        void setData(Containers::ArrayView<ErasedType> data) {
+            _data = {reinterpret_cast<Type*>(data.data()), data.size()};
         }
 
     private:
+        /* Needed for mutable->const conversion */
+        template<UnsignedInt, class> friend class CompressedImageView;
+
         /* To be made public once block size and block data size are stored
            together with the image */
-        explicit CompressedImageView(CompressedPixelStorage storage, UnsignedInt format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<const void> data) noexcept;
+        explicit CompressedImageView(CompressedPixelStorage storage, UnsignedInt format, const VectorTypeFor<dimensions, Int>& size, Containers::ArrayView<ErasedType> data) noexcept;
         explicit CompressedImageView(CompressedPixelStorage storage, UnsignedInt format, const VectorTypeFor<dimensions, Int>& size) noexcept;
 
         CompressedPixelStorage _storage;
         CompressedPixelFormat _format;
         Math::Vector<Dimensions, Int> _size;
-        Containers::ArrayView<const char> _data;
+        Containers::ArrayView<Type> _data;
 };
 
-/** @brief One-dimensional compressed image view */
-typedef CompressedImageView<1> CompressedImageView1D;
+/**
+@brief Const compressed image view
 
-/** @brief Two-dimensional compressed image view */
-typedef CompressedImageView<2> CompressedImageView2D;
+@see @ref CompressedImageView1D, @ref CompressedImageView2D,
+    @ref CompressedImageView3D, @ref BasicMutableImageView
+*/
+#ifndef CORRADE_MSVC2015_COMPATIBILITY /* Multiple definitions still broken */
+template<UnsignedInt dimensions> using BasicCompressedImageView = CompressedImageView<dimensions, const char>;
+#endif
 
-/** @brief Three-dimensional compressed image view */
-typedef CompressedImageView<3> CompressedImageView3D;
+/**
+@brief One-dimensional compressed image view
 
-namespace Implementation {
-    template<class T> inline UnsignedInt pixelSizeAdl(T format) {
-        return pixelSize(format);
-    }
+@see @ref MutableCompressedImageView1D, @ref ImageView1D,
+    @ref CompressedImageView
+*/
+typedef BasicCompressedImageView<1> CompressedImageView1D;
 
-    template<class T, class U> inline UnsignedInt pixelSizeAdl(T format, U formatExtra) {
-        return pixelSize(format, formatExtra);
-    }
-}
+/**
+@brief Two-dimensional compressed image view
 
-template<UnsignedInt dimensions> template<class T, class U> inline ImageView<dimensions>::ImageView(const PixelStorage storage, const T format, const U formatExtra, const VectorTypeFor<dimensions, Int>& size, const Containers::ArrayView<const void> data) noexcept: ImageView{storage, UnsignedInt(format), UnsignedInt(formatExtra), Implementation::pixelSizeAdl(format, formatExtra), size, data} {
+@see @ref MutableCompressedImageView2D, @ref ImageView2D,
+    @ref CompressedImageView
+*/
+typedef BasicCompressedImageView<2> CompressedImageView2D;
+
+/**
+@brief Three-dimensional compressed image view
+
+@see @ref MutableCompressedImageView3D, @ref ImageView3D,
+    @ref CompressedImageView
+*/
+typedef BasicCompressedImageView<3> CompressedImageView3D;
+
+/**
+@brief Mutable compressed image view
+
+@see @ref MutableCompressedImageView1D, @ref MutableCompressedImageView2D,
+    @ref MutableCompressedImageView3D, @ref BasicCompressedImageView
+*/
+#ifndef CORRADE_MSVC2015_COMPATIBILITY /* Multiple definitions still broken */
+template<UnsignedInt dimensions> using BasicMutableCompressedImageView = CompressedImageView<dimensions, char>;
+#endif
+
+/**
+@brief One-dimensional mutable compressed image view
+
+@see @ref CompressedImageView1D, @ref MutableImageView1D,
+    @ref CompressedImageView
+*/
+typedef BasicMutableCompressedImageView<1> MutableCompressedImageView1D;
+
+/**
+@brief Two-dimensional mutable compressed image view
+
+@see @ref CompressedImageView2D, @ref MutableImageView2D,
+    @ref CompressedImageView
+*/
+typedef BasicMutableCompressedImageView<2> MutableCompressedImageView2D;
+
+/**
+@brief Three-dimensional mutable compressed image view
+
+@see @ref CompressedImageView3D, @ref MutableImageView3D,
+    @ref CompressedImageView
+*/
+typedef BasicMutableCompressedImageView<3> MutableCompressedImageView3D;
+
+template<UnsignedInt dimensions, class T> template<class U, class V> inline ImageView<dimensions, T>::ImageView(const PixelStorage storage, const U format, const V formatExtra, const VectorTypeFor<dimensions, Int>& size, const Containers::ArrayView<ErasedType> data) noexcept: ImageView{storage, UnsignedInt(format), UnsignedInt(formatExtra), Implementation::pixelSizeAdl(format, formatExtra), size, data} {
     static_assert(sizeof(T) <= 4 && sizeof(U) <= 4,
         "format types larger than 32bits are not supported");
 }
 
-template<UnsignedInt dimensions> template<class T> inline ImageView<dimensions>::ImageView(const PixelStorage storage, const T format, const VectorTypeFor<dimensions, Int>& size, const Containers::ArrayView<const void> data) noexcept: ImageView{storage, UnsignedInt(format), {}, Implementation::pixelSizeAdl(format), size, data} {
-    static_assert(sizeof(T) <= 4,
+template<UnsignedInt dimensions, class T> template<class U> inline ImageView<dimensions, T>::ImageView(const PixelStorage storage, const U format, const VectorTypeFor<dimensions, Int>& size, const Containers::ArrayView<ErasedType> data) noexcept: ImageView{storage, UnsignedInt(format), {}, Implementation::pixelSizeAdl(format), size, data} {
+    static_assert(sizeof(U) <= 4,
         "format types larger than 32bits are not supported");
 }
 
-template<UnsignedInt dimensions> template<class T, class U> inline ImageView<dimensions>::ImageView(const PixelStorage storage, const T format, const U formatExtra, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{storage, UnsignedInt(format), UnsignedInt(formatExtra), Implementation::pixelSizeAdl(format, formatExtra), size} {
-    static_assert(sizeof(T) <= 4 && sizeof(U) <= 4,
+template<UnsignedInt dimensions, class T> template<class U, class V> inline ImageView<dimensions, T>::ImageView(const PixelStorage storage, const U format, const V formatExtra, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{storage, UnsignedInt(format), UnsignedInt(formatExtra), Implementation::pixelSizeAdl(format, formatExtra), size} {
+    static_assert(sizeof(U) <= 4 && sizeof(U) <= 4,
         "format types larger than 32bits are not supported");
 }
 
-template<UnsignedInt dimensions> template<class T> inline ImageView<dimensions>::ImageView(const PixelStorage storage, const T format, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{storage, UnsignedInt(format), {}, Implementation::pixelSizeAdl(format), size} {
-    static_assert(sizeof(T) <= 4,
+template<UnsignedInt dimensions, class T> template<class U> inline ImageView<dimensions, T>::ImageView(const PixelStorage storage, const U format, const VectorTypeFor<dimensions, Int>& size) noexcept: ImageView{storage, UnsignedInt(format), {}, Implementation::pixelSizeAdl(format), size} {
+    static_assert(sizeof(U) <= 4,
         "format types larger than 32bits are not supported");
 }
 
-template<UnsignedInt dimensions> template<class T> inline  CompressedImageView<dimensions>::CompressedImageView(const CompressedPixelStorage storage, const T format, const VectorTypeFor<dimensions, Int>& size, const Containers::ArrayView<const void> data) noexcept: CompressedImageView{storage, UnsignedInt(format), size, data} {
-    static_assert(sizeof(T) <= 4,
+#ifndef DOXYGEN_GENERATING_OUTPUT /* it complains otherwise. why? don't know, don't want to know */
+template<UnsignedInt dimensions, class T> template<UnsignedInt otherDimensions, class> ImageView<dimensions, T>::ImageView(const ImageView<otherDimensions, T>& other) noexcept: _storage{other._storage}, _format{other._format}, _formatExtra{other._formatExtra}, _pixelSize{other._pixelSize}, _size{Math::Vector<dimensions, Int>::pad(other._size, 1)}, _data{other._data} {}
+#endif
+
+template<UnsignedInt dimensions, class T> template<class U, class> ImageView<dimensions, T>::ImageView(const ImageView<dimensions, U>& other) noexcept: _storage{other._storage}, _format{other._format}, _formatExtra{other._formatExtra}, _pixelSize{other._pixelSize}, _size{other._size}, _data{other._data} {}
+
+template<UnsignedInt dimensions, class T> template<class U> inline  CompressedImageView<dimensions, T>::CompressedImageView(const CompressedPixelStorage storage, const U format, const VectorTypeFor<dimensions, Int>& size, const Containers::ArrayView<ErasedType> data) noexcept: CompressedImageView{storage, UnsignedInt(format), size, data} {
+    static_assert(sizeof(U) <= 4,
         "format types larger than 32bits are not supported");
 }
 
-template<UnsignedInt dimensions> template<class T> inline CompressedImageView<dimensions>::CompressedImageView(const CompressedPixelStorage storage, const T format, const VectorTypeFor<dimensions, Int>& size) noexcept: CompressedImageView{storage, UnsignedInt(format), size} {
-    static_assert(sizeof(T) <= 4,
+template<UnsignedInt dimensions, class T> template<class U> inline CompressedImageView<dimensions, T>::CompressedImageView(const CompressedPixelStorage storage, const U format, const VectorTypeFor<dimensions, Int>& size) noexcept: CompressedImageView{storage, UnsignedInt(format), size} {
+    static_assert(sizeof(U) <= 4,
         "format types larger than 32bits are not supported");
 }
+
+#ifndef DOXYGEN_GENERATING_OUTPUT /* it complains otherwise. why? don't know, don't want to know */
+template<UnsignedInt dimensions, class T> template<UnsignedInt otherDimensions, class> CompressedImageView<dimensions, T>::CompressedImageView(const CompressedImageView<otherDimensions, T>& other) noexcept: _storage{other._storage}, _format{other._format}, _size{Math::Vector<dimensions, Int>::pad(other._size, 1)}, _data{other._data} {}
+#endif
+
+template<UnsignedInt dimensions, class T> template<class U, class> CompressedImageView<dimensions, T>::CompressedImageView(const CompressedImageView<dimensions, U>& other) noexcept: _storage{other._storage}, _format{other._format}, _size{other._size}, _data{other._data} {}
 
 }
 

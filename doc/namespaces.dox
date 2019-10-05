@@ -258,10 +258,18 @@ Audio import, playback and integration with @ref SceneGraph.
 
 This library depends on the [OpenAL](https://www.openal.org/) library. It is
 built if `WITH_AUDIO` is enabled when building Magnum. To use this library with
-CMake, you need to request the `Audio` component of the `Magnum` package and
-link to the `Magnum::Audio` target:
+CMake, you need to copy
+[FindOpenAL.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenAL.cmake)
+from the `modules/` directory in Magnum sources to a `modules/` dir in your
+project and pointing `CMAKE_MODULE_PATH` to it (if not done already) so it is
+able to correctly find the OpenAL library on all platforms. Then request the
+`Audio` component of the `Magnum` package and link to the `Magnum::Audio`
+target:
 
 @code{.cmake}
+# Path where FindOpenAL.cmake can be found, adapt as needed
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
+
 find_package(Magnum REQUIRED Audio)
 
 # ...
@@ -320,6 +328,19 @@ find_package(Magnum REQUIRED GL)
 
 # ...
 target_link_libraries(your-app Magnum::GL)
+@endcode
+
+In case you're building for EGL or OpenGL ES platforms, you also need to copy
+[FindEGL.cmake](https://github.com/mosra/magnum/blob/master/modules/FindEGL.cmake),
+[FindOpenGLES2.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenGLES2.cmake)
+or [FindOpenGLES3.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenGLES3.cmake)
+from the `modules/` directory in Magnum sources to a `modules/` dir in your
+project and pointing `CMAKE_MODULE_PATH` to it (if not done already) so it is
+able to find the EGL and OpenGL ES libraries:
+
+@code{.cmake}
+# Path where FindEGL.cmake and others can be found, adapt as needed
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
 @endcode
 
 See @ref building, @ref cmake and @ref opengl for more information.
@@ -426,6 +447,49 @@ target_link_libraries(your-app Magnum::Shaders)
 @endcode
 
 See @ref building, @ref cmake and @ref shaders for more information.
+
+@m_class{m-row}
+
+@parblock
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-flat.png
+@ref Flat @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-phong.png
+@ref Phong @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-vertexcolor.png
+@ref VertexColor @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-meshvisualizer.png
+@ref MeshVisualizer @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@endparblock
+
+@m_class{m-row}
+
+@parblock
+
+@m_div{m-col-m-3 m-push-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-vector.png
+@ref Vector @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-push-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-distancefieldvector.png
+@ref DistanceFieldVector @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@endparblock
+
 */
 
 /** @dir Magnum/Text
@@ -434,7 +498,7 @@ See @ref building, @ref cmake and @ref shaders for more information.
 /** @namespace Magnum::Text
 @brief Text rendering
 
-Font texture creation and text layouting.
+Font texture creation and text layout.
 
 This library is built if `WITH_TEXT` is enabled when building Magnum. To use
 this library with CMake, you need to request the `Text` component of the

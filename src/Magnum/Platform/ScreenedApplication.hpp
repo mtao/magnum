@@ -34,8 +34,109 @@
 
 namespace Magnum { namespace Platform {
 
+namespace Implementation {
+
+template<class Application, bool implements> void ApplicationKeyEventMixin<Application, implements>::callKeyPressEvent(KeyEvent&, Containers::LinkedList<BasicScreen<Application>>&) {}
+template<class Application> void ApplicationKeyEventMixin<Application, true>::callKeyPressEvent(typename Application::KeyEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens) {
+    /* Front-to-back event propagation, stop when the event gets accepted */
+    for(BasicScreen<Application>* s = screens.first(); s; s = s->nextFartherScreen()) {
+        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
+            s->keyPressEvent(event);
+            if(event.isAccepted()) break;
+        }
+    }
+}
+
+template<class Application, bool implements> void ApplicationKeyEventMixin<Application, implements>::callKeyReleaseEvent(KeyEvent&, Containers::LinkedList<BasicScreen<Application>>&) {}
+template<class Application> void ApplicationKeyEventMixin<Application, true>::callKeyReleaseEvent(typename Application::KeyEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens) {
+    /* Front-to-back event propagation, stop when the event gets accepted */
+    for(BasicScreen<Application>* s = screens.first(); s; s = s->nextFartherScreen()) {
+        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
+            s->keyReleaseEvent(event);
+            if(event.isAccepted()) break;
+        }
+    }
+}
+
+template<class Application, bool implements> void ApplicationMouseScrollEventMixin<Application, implements>::callMouseScrollEvent(MouseScrollEvent&, Containers::LinkedList<BasicScreen<Application>>&) {}
+template<class Application> void ApplicationMouseScrollEventMixin<Application, true>::callMouseScrollEvent(typename Application::MouseScrollEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens) {
+    /* Front-to-back event propagation, stop when the event gets accepted */
+    for(BasicScreen<Application>* s = screens.first(); s; s = s->nextFartherScreen()) {
+        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
+            s->mouseScrollEvent(event);
+            if(event.isAccepted()) break;
+        }
+    }
+}
+
+template<class Application, bool implements> void ApplicationTextInputEventMixin<Application, implements>::callTextInputEvent(TextInputEvent&, Containers::LinkedList<BasicScreen<Application>>&) {}
+template<class Application> void ApplicationTextInputEventMixin<Application, true>::callTextInputEvent(typename Application::TextInputEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens) {
+    /* Front-to-back event propagation, stop when the event gets accepted */
+    for(BasicScreen<Application>* s = screens.first(); s; s = s->nextFartherScreen()) {
+        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
+            s->textInputEvent(event);
+            if(event.isAccepted()) break;
+        }
+    }
+}
+
+template<class Application, bool implements> void ApplicationTextEditingEventMixin<Application, implements>::callTextEditingEvent(TextEditingEvent&, Containers::LinkedList<BasicScreen<Application>>&) {}
+template<class Application> void ApplicationTextEditingEventMixin<Application,
+true>::callTextEditingEvent(typename Application::TextEditingEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens) {
+    /* Front-to-back event propagation, stop when the event gets accepted */
+    for(BasicScreen<Application>* s = screens.first(); s; s = s->nextFartherScreen()) {
+        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
+            s->textEditingEvent(event);
+            if(event.isAccepted()) break;
+        }
+    }
+}
+
+template<class Application> void ScreenKeyEventMixin<Application,
+true>::keyPressEvent(KeyEvent&) {}
+template<class Application> void ScreenKeyEventMixin<Application,
+true>::keyReleaseEvent(KeyEvent&) {}
+template<class Application> void ScreenMouseScrollEventMixin<Application,
+true>::mouseScrollEvent(MouseScrollEvent&) {}
+template<class Application> void ScreenTextInputEventMixin<Application,
+true>::textInputEvent(TextInputEvent&) {}
+template<class Application> void ScreenTextEditingEventMixin<Application,
+true>::textEditingEvent(TextEditingEvent&) {}
+
+}
+
 template<class Application> BasicScreen<Application>::BasicScreen() = default;
+
+template<class Application> BasicScreen<Application>::BasicScreen(BasicScreenedApplication<Application>& application, PropagatedEvents events) {
+    /* A superset of this (together with focusEvent()) is done in
+       BasicScreenedApplication::addScreen() as well. Keep in sync. */
+    application.Containers::template LinkedList<BasicScreen<Application>>::insert(this);
+    redraw();
+    setPropagatedEvents(events);
+}
+
 template<class Application> BasicScreen<Application>::~BasicScreen() = default;
+
+template<class Application> BasicScreenedApplication<Application>& BasicScreen<Application>::application() {
+    BasicScreenedApplication<Application>* application = Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::list();
+    CORRADE_ASSERT(application, "Platform::Screen::application(): the screen is not added to any application", *application);
+    return *application;
+}
+
+template<class Application> const BasicScreenedApplication<Application>& BasicScreen<Application>::application() const {
+    const BasicScreenedApplication<Application>* application = Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::list();
+    CORRADE_ASSERT(application, "Platform::Screen::application(): the screen is not added to any application", *application);
+    return *application;
+}
+
+template<class Application> void BasicScreen<Application>::redraw() {
+    BasicScreenedApplication<Application>* application = Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::list();
+    CORRADE_ASSERT(application, "Platform::Screen::redraw(): the screen is not added to any application", );
+    application->redraw();
+}
+
+template<class Application> void BasicScreen<Application>::focusEvent() {}
+template<class Application> void BasicScreen<Application>::blurEvent() {}
 
 template<class Application> void BasicScreen<Application>::viewportEvent(ViewportEvent& event) {
     #ifdef MAGNUM_BUILD_DEPRECATED
@@ -51,8 +152,6 @@ template<class Application> void BasicScreen<Application>::viewportEvent(Viewpor
 template<class Application> void BasicScreen<Application>::viewportEvent(const Vector2i&) {}
 #endif
 
-template<class Application> void BasicScreen<Application>::keyPressEvent(KeyEvent&) {}
-template<class Application> void BasicScreen<Application>::keyReleaseEvent(KeyEvent&) {}
 template<class Application> void BasicScreen<Application>::mousePressEvent(MouseEvent&) {}
 template<class Application> void BasicScreen<Application>::mouseReleaseEvent(MouseEvent&) {}
 template<class Application> void BasicScreen<Application>::mouseMoveEvent(MouseMoveEvent&) {}
@@ -68,6 +167,12 @@ template<class Application> BasicScreenedApplication<Application>::BasicScreened
 template<class Application> BasicScreenedApplication<Application>::~BasicScreenedApplication() = default;
 
 template<class Application> BasicScreenedApplication<Application>& BasicScreenedApplication<Application>::addScreen(BasicScreen<Application>& screen) {
+    CORRADE_ASSERT(!screen.hasApplication(),
+        "Platform::ScreenedApplication::addScreen(): screen already added to an application", *this);
+
+    /* A subset of this (except focusEvent()) is done in
+       BasicScreen(BasicScreenedApplication&, PropagatedEvents) as well. Keep
+       in sync. */
     Containers::LinkedList<BasicScreen<Application>>::insert(&screen);
     if(screens().first() == &screen) screen.focusEvent();
     Application::redraw();
@@ -75,6 +180,9 @@ template<class Application> BasicScreenedApplication<Application>& BasicScreened
 }
 
 template<class Application> BasicScreenedApplication<Application>& BasicScreenedApplication<Application>::removeScreen(BasicScreen<Application>& screen) {
+    CORRADE_ASSERT(screen.hasApplication() && &screen.application() == this,
+        "Platform::ScreenedApplication::removeScreen(): screen not owned by this application", *this);
+
     screen.blurEvent();
     Containers::LinkedList<BasicScreen<Application>>::erase(&screen);
     Application::redraw();
@@ -82,6 +190,9 @@ template<class Application> BasicScreenedApplication<Application>& BasicScreened
 }
 
 template<class Application> BasicScreenedApplication<Application>& BasicScreenedApplication<Application>::focusScreen(BasicScreen<Application>& screen) {
+    CORRADE_ASSERT(screen.hasApplication() && &screen.application() == this,
+        "Platform::ScreenedApplication::focusScreen(): screen not owned by this application", *this);
+
     /* Already focused, nothing to do */
     if(screens().first() == &screen) return *this;
 
@@ -110,24 +221,12 @@ template<class Application> void BasicScreenedApplication<Application>::drawEven
     globalDrawEvent();
 }
 
-template<class Application> void BasicScreenedApplication<Application>::keyPressEvent(typename Application::KeyEvent& event) {
-    /* Front-to-back event propagation, stop when the event gets accepted */
-    for(BasicScreen<Application>* s = screens().first(); s; s = s->nextFartherScreen()) {
-        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
-            s->keyPressEvent(event);
-            if(event.isAccepted()) break;
-        }
-    }
+template<class Application> void BasicScreenedApplication<Application>::keyPressEvent(typename BasicScreenedApplication<Application>::KeyEvent& event) {
+    this->callKeyPressEvent(event, screens());
 }
 
-template<class Application> void BasicScreenedApplication<Application>::keyReleaseEvent(typename Application::KeyEvent& event) {
-    /* Front-to-back event propagation, stop when the event gets accepted */
-    for(BasicScreen<Application>* s = screens().first(); s; s = s->nextFartherScreen()) {
-        if(s->propagatedEvents() & Implementation::PropagatedScreenEvent::Input) {
-            s->keyReleaseEvent(event);
-            if(event.isAccepted()) break;
-        }
-    }
+template<class Application> void BasicScreenedApplication<Application>::keyReleaseEvent(typename BasicScreenedApplication<Application>::KeyEvent& event) {
+    this->callKeyReleaseEvent(event, screens());
 }
 
 template<class Application> void BasicScreenedApplication<Application>::mousePressEvent(typename Application::MouseEvent& event) {
@@ -158,6 +257,18 @@ template<class Application> void BasicScreenedApplication<Application>::mouseMov
             if(event.isAccepted()) break;
         }
     }
+}
+
+template<class Application> void BasicScreenedApplication<Application>::mouseScrollEvent(typename BasicScreenedApplication<Application>::MouseScrollEvent& event) {
+    this->callMouseScrollEvent(event, screens());
+}
+
+template<class Application> void BasicScreenedApplication<Application>::textInputEvent(typename BasicScreenedApplication<Application>::TextInputEvent& event) {
+    this->callTextInputEvent(event, screens());
+}
+
+template<class Application> void BasicScreenedApplication<Application>::textEditingEvent(typename BasicScreenedApplication<Application>::TextEditingEvent& event) {
+    this->callTextEditingEvent(event, screens());
 }
 
 }}

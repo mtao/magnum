@@ -30,8 +30,7 @@
  */
 
 #include "Magnum/GL/AbstractShaderProgram.h"
-#include "Magnum/Math/Color.h"
-#include "Magnum/Math/Matrix4.h"
+#include "Magnum/Shaders/Generic.h"
 #include "Magnum/Shaders/visibility.h"
 
 namespace Magnum { namespace Shaders {
@@ -73,7 +72,7 @@ is optionally used for improving line appearance.
 
 @section Shaders-MeshVisualizer-usage Example usage
 
-@subsection Shaders-MeshVisualizer-usage-wireframe-geom Wireframe visualization with geometry shader (desktop GL)
+@subsection Shaders-MeshVisualizer-usage-wireframe-geom Wireframe visualization with a geometry shader (desktop GL, OpenGL ES 3.2)
 
 Common mesh setup:
 
@@ -83,22 +82,22 @@ Common rendering setup:
 
 @snippet MagnumShaders.cpp MeshVisualizer-usage-geom2
 
-@subsection Shaders-MeshVisualizer-usage-wireframe-no-geom-old Wireframe visualization without geometry shader on older hardware
+@subsection Shaders-MeshVisualizer-usage-wireframe-no-geom Wireframe visualization of indexed meshes without a geometry shader
+
+The vertices have to be be converted to a non-indexed array. Mesh setup:
+
+@snippet MagnumShaders.cpp MeshVisualizer-usage-no-geom1
+
+Rendering setup:
+
+@snippet MagnumShaders.cpp MeshVisualizer-usage-no-geom2
+
+@subsection Shaders-MeshVisualizer-usage-wireframe-no-geom-old Wireframe visualization of non-indexed meshes without a geometry shader on older hardware
 
 You need to provide also the @ref VertexIndex attribute. Mesh setup *in
 addition to the above*:
 
-@snippet MagnumShaders.cpp MeshVisualizer-usage-no-geom-old1
-
-Rendering setup:
-
-@snippet MagnumShaders.cpp MeshVisualizer-usage-no-geom-old2
-
-@subsection Shaders-MeshVisualizer-usage-wireframe-no-geom Wireframe visualization of indexed meshes without geometry shader
-
-The vertices must be converted to non-indexed array. Mesh setup:
-
-@snippet MagnumShaders.cpp MeshVisualizer-usage-no-geom
+@snippet MagnumShaders.cpp MeshVisualizer-usage-no-geom-old
 
 Rendering setup the same as above.
 
@@ -113,7 +112,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          * @ref shaders-generic "Generic attribute",
          * @ref Magnum::Vector3 "Vector3".
          */
-        typedef GL::Attribute<0, Vector3> Position;
+        typedef Generic3D::Position Position;
 
         /**
          * @brief Vertex index
@@ -122,10 +121,20 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          * 2.0 if @ref Flag::Wireframe is enabled. This attribute (modulo 3)
          * specifies index of given vertex in triangle, i.e. @cpp 0.0f @ce for
          * first, @cpp 1.0f @ce for second, @cpp 2.0f @ce for third. In OpenGL
-         * 3.1, OpenGL ES 3.0 and newer this value is provided by the shader
-         * itself, so the attribute is not needed.
+         * 3.1, OpenGL ES 3.0 and newer this value is provided via the
+         * @cb{.glsl} gl_VertexID @ce shader builtin, so the attribute is not
+         * needed.
          */
-        typedef GL::Attribute<3, Float> VertexIndex;
+        typedef GL::Attribute<5, Float> VertexIndex;
+
+        enum: UnsignedInt {
+            /**
+             * Color shader output. @ref shaders-generic "Generic output",
+             * present always. Expects three- or four-component floating-point
+             * or normalized buffer attachment.
+             */
+            ColorOutput = Generic3D::ColorOutput
+        };
 
         /**
          * @brief Flag
@@ -146,7 +155,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
             /**
              * Don't use geometry shader for wireframe visualization. If
              * enabled, you might need to provide also @ref VertexIndex
-             * attribute in the mesh. In OpenGL ES enabled alongside
+             * attribute in the mesh. In OpenGL ES 2.0 enabled alongside
              * @ref Flag::Wireframe.
              */
             NoGeometryShader = 1 << 1
@@ -164,7 +173,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
         /**
          * @brief Construct without creating the underlying OpenGL object
          *
-         * The constructed instance is equivalent to moved-from state. Useful
+         * The constructed instance is equivalent to a moved-from state. Useful
          * in cases where you will overwrite the instance later anyway. Move
          * another object over it to make it useful.
          *
@@ -194,10 +203,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          *
          * Initial value is an identity matrix.
          */
-        MeshVisualizer& setTransformationProjectionMatrix(const Matrix4& matrix) {
-            setUniform(_transformationProjectionMatrixUniform, matrix);
-            return *this;
-        }
+        MeshVisualizer& setTransformationProjectionMatrix(const Matrix4& matrix);
 
         /**
          * @brief Set viewport size
@@ -206,11 +212,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          * Has effect only if @ref Flag::Wireframe is enabled and geometry
          * shaders are used. Initial value is a zero vector.
          */
-        MeshVisualizer& setViewportSize(const Vector2& size) {
-            if(_flags & Flag::Wireframe && !(_flags & Flag::NoGeometryShader))
-                setUniform(_viewportSizeUniform, size);
-            return *this;
-        }
+        MeshVisualizer& setViewportSize(const Vector2& size);
 
         /**
          * @brief Set base object color
@@ -218,10 +220,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          *
          * Initial value is @cpp 0xffffffff_rgbaf @ce.
          */
-        MeshVisualizer& setColor(const Color4& color) {
-            setUniform(_colorUniform, color);
-            return *this;
-        }
+        MeshVisualizer& setColor(const Color4& color);
 
         /**
          * @brief Set wireframe color
@@ -230,10 +229,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          * Initial value is @cpp 0x000000ff_rgbaf @ce. Has effect only if
          * @ref Flag::Wireframe is enabled.
          */
-        MeshVisualizer& setWireframeColor(const Color4& color) {
-            if(_flags & Flag::Wireframe) setUniform(_wireframeColorUniform, color);
-            return *this;
-        }
+        MeshVisualizer& setWireframeColor(const Color4& color);
 
         /**
          * @brief Set wireframe width
@@ -242,10 +238,7 @@ class MAGNUM_SHADERS_EXPORT MeshVisualizer: public GL::AbstractShaderProgram {
          * Initial value is @cpp 1.0f @ce. Has effect only if @ref Flag::Wireframe
          * is enabled.
          */
-        MeshVisualizer& setWireframeWidth(Float width) {
-            if(_flags & Flag::Wireframe) setUniform(_wireframeWidthUniform, width);
-            return *this;
-        }
+        MeshVisualizer& setWireframeWidth(Float width);
 
         /**
          * @brief Set line smoothness
@@ -273,12 +266,6 @@ MAGNUM_SHADERS_EXPORT Debug& operator<<(Debug& debug, MeshVisualizer::Flag value
 MAGNUM_SHADERS_EXPORT Debug& operator<<(Debug& debug, MeshVisualizer::Flags value);
 
 CORRADE_ENUMSET_OPERATORS(MeshVisualizer::Flags)
-
-inline MeshVisualizer& MeshVisualizer::setSmoothness(Float smoothness) {
-    if(_flags & Flag::Wireframe)
-        setUniform(_smoothnessUniform, smoothness);
-    return *this;
-}
 
 }}
 

@@ -29,6 +29,7 @@
 #include <Corrade/Utility/DebugStl.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
 #include "Magnum/Text/AbstractGlyphCache.h"
 
@@ -126,7 +127,7 @@ void AbstractGlyphCacheTest::setImage() {
         Vector2i imageOffset, imageSize;
     } cache{{100, 200}};
 
-    cache.setImage({80, 175}, ImageView2D{{}, {20, 25}, nullptr});
+    cache.setImage({80, 175}, ImageView2D{PixelFormat::R8Unorm, {20, 25}});
 
     CORRADE_COMPARE(cache.imageOffset, (Vector2i{80, 175}));
     CORRADE_COMPARE(cache.imageSize, (Vector2i{20, 25}));
@@ -137,9 +138,9 @@ void AbstractGlyphCacheTest::setImageOutOfBounds() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    cache.setImage({80, 175}, ImageView2D{{}, {20, 25}, nullptr});
-    cache.setImage({81, 175}, ImageView2D{{}, {20, 25}, nullptr});
-    cache.setImage({80, -1}, ImageView2D{{}, {20, 25}, nullptr});
+    cache.setImage({80, 175}, ImageView2D{PixelFormat::R8Unorm, {20, 25}});
+    cache.setImage({81, 175}, ImageView2D{PixelFormat::R8Unorm, {20, 25}});
+    cache.setImage({80, -1}, ImageView2D{PixelFormat::R8Unorm, {20, 25}});
 
     CORRADE_COMPARE(out.str(),
         "Text::AbstractGlyphCache::setImage(): Range({81, 175}, {101, 200}) out of bounds for texture size Vector(100, 200)\n"

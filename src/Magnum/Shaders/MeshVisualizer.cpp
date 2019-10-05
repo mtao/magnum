@@ -30,6 +30,8 @@
 #include <Corrade/Containers/Reference.h>
 #include <Corrade/Utility/Resource.h>
 
+#include "Magnum/Math/Color.h"
+#include "Magnum/Math/Matrix4.h"
 #include "Magnum/GL/Context.h"
 #include "Magnum/GL/Extensions.h"
 #include "Magnum/GL/Shader.h"
@@ -85,6 +87,7 @@ MeshVisualizer::MeshVisualizer(const Flags flags): _flags{flags} {
         .addSource(rs.get("MeshVisualizer.vert"));
     frag.addSource(flags & Flag::Wireframe ? "#define WIREFRAME_RENDERING\n" : "")
         .addSource(flags & Flag::NoGeometryShader ? "#define NO_GEOMETRY_SHADER\n" : "")
+        .addSource(rs.get("generic.glsl"))
         .addSource(rs.get("MeshVisualizer.frag"));
 
     #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
@@ -106,10 +109,10 @@ MeshVisualizer::MeshVisualizer(const Flags flags): _flags{flags} {
     if(geom) attachShader(*geom);
     #endif
 
+    /* ES3 has this done in the shader directly */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
     #ifndef MAGNUM_TARGET_GLES
     if(!GL::Context::current().isExtensionSupported<GL::Extensions::ARB::explicit_attrib_location>(version))
-    #else
-    if(!GL::Context::current().isVersionSupported(GL::Version::GLES300))
     #endif
     {
         bindAttributeLocation(Position::Location, "position");
@@ -123,6 +126,7 @@ MeshVisualizer::MeshVisualizer(const Flags flags): _flags{flags} {
         }
         #endif
     }
+    #endif
 
     CORRADE_INTERNAL_ASSERT_OUTPUT(link());
 
@@ -152,6 +156,47 @@ MeshVisualizer::MeshVisualizer(const Flags flags): _flags{flags} {
         setSmoothness(2.0f);
     }
     #endif
+}
+
+MeshVisualizer& MeshVisualizer::setTransformationProjectionMatrix(const Matrix4& matrix) {
+    setUniform(_transformationProjectionMatrixUniform, matrix);
+    return *this;
+}
+
+MeshVisualizer& MeshVisualizer::setViewportSize(const Vector2& size) {
+    /* Not asserting here, since the relation to wireframe is a bit vague.
+       Also it's an ugly hack that should be removed, ideally. */
+    if(_flags & Flag::Wireframe && !(_flags & Flag::NoGeometryShader))
+        setUniform(_viewportSizeUniform, size);
+    return *this;
+}
+
+MeshVisualizer& MeshVisualizer::setColor(const Color4& color) {
+    setUniform(_colorUniform, color);
+    return *this;
+}
+
+MeshVisualizer& MeshVisualizer::setWireframeColor(const Color4& color) {
+    CORRADE_ASSERT(_flags & Flag::Wireframe,
+        "Shaders::MeshVisualizer::setWireframeColor(): the shader was not created with wireframe enabled", *this);
+    setUniform(_wireframeColorUniform, color);
+    return *this;
+}
+
+MeshVisualizer& MeshVisualizer::setWireframeWidth(const Float width) {
+    CORRADE_ASSERT(_flags & Flag::Wireframe,
+        "Shaders::MeshVisualizer::setWireframeWidth(): the shader was not created with wireframe enabled", *this);
+    setUniform(_wireframeWidthUniform, width);
+    return *this;
+}
+
+MeshVisualizer& MeshVisualizer::setSmoothness(const Float smoothness) {
+    /* This is a bit vaguely related too, but less vague than setViewportSize()
+       so asserting. */
+    CORRADE_ASSERT(_flags & Flag::Wireframe,
+        "Shaders::MeshVisualizer::setSmoothness(): the shader was not created with wireframe enabled", *this);
+    setUniform(_smoothnessUniform, smoothness);
+    return *this;
 }
 
 Debug& operator<<(Debug& debug, const MeshVisualizer::Flag value) {

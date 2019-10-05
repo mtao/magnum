@@ -4,6 +4,7 @@
     Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019
               Vladimír Vondruš <mosra@centrum.cz>
     Copyright © 2015 Jonathan Hale <squareys@googlemail.com>
+    Copyright © 2019 Guillaume Jacquemin <williamjcm@users.noreply.github.com>
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -32,6 +33,7 @@
 #include <alc.h>
 #include <cstring>
 
+#include <Corrade/Utility/Arguments.h>
 #include <Corrade/Utility/Assert.h>
 #include <Corrade/Utility/Debug.h>
 #include <Corrade/Utility/DebugStl.h>
@@ -50,6 +52,7 @@ constexpr Extension ExtensionList[]{
     _extension(AL,EXT,ALAW),
     _extension(AL,EXT,MULAW),
     _extension(AL,EXT,MCFORMATS),
+    _extension(AL,SOFT,loop_points),
     _extension(ALC,EXT,ENUMERATION),
     _extension(ALC,SOFTX,HRTF),
     _extension(ALC,SOFT,HRTF)
@@ -101,8 +104,6 @@ const char* alcErrorString(const ALenum error) {
 
 }
 
-Context* Context::_current = nullptr;
-
 std::vector<std::string> Context::deviceSpecifierStrings() {
     std::vector<std::string> list;
     const char* const devices = alcGetString(nullptr, ALC_DEVICE_SPECIFIER);
@@ -112,29 +113,63 @@ std::vector<std::string> Context::deviceSpecifierStrings() {
     return list;
 }
 
-bool Context::hasCurrent() { return _current; }
-
-Context& Context::current() {
-    CORRADE_ASSERT(_current, "Audio::Context::current(): no current context", *_current);
-    return *_current;
-}
-
-#ifndef DOXYGEN_GENERATING_OUTPUT
-Context::Context(): Context{Configuration{}} {}
+#ifndef MAGNUM_BUILD_STATIC
+/* (Of course) can't be in an unnamed namespace in order to export it below */
+namespace {
 #endif
 
-Context::Context(const Configuration& configuration) {
-    create(configuration);
+/* Unlike GL, this isn't thread-local. Would need to implement
+   ALC_EXT_thread_local_context first */
+#if defined(MAGNUM_BUILD_STATIC) && !defined(CORRADE_TARGET_WINDOWS)
+/* On static builds that get linked to multiple shared libraries and then used
+   in a single app we want to ensure there's just one global symbol. On Linux
+   it's apparently enough to just export, macOS needs the weak attribute.
+   Windows not handled yet, as it needs a workaround using DllMain() and
+   GetProcAddress(). */
+CORRADE_VISIBILITY_EXPORT
+    #ifdef __GNUC__
+    __attribute__((weak))
+    #else
+    /* uh oh? the test will fail, probably */
+    #endif
+#endif
+Context* currentContext = nullptr;
+
+#ifndef MAGNUM_BUILD_STATIC
+}
+#endif
+
+bool Context::hasCurrent() { return currentContext; }
+
+Context& Context::current() {
+    CORRADE_ASSERT(currentContext, "Audio::Context::current(): no current context", *currentContext);
+    return *currentContext;
 }
 
-Context::Context(NoCreateT) noexcept: _device{}, _context{} {}
+Context::Context(Int argc, const char** argv): Context(Configuration{}, argc, argv) {}
+
+Context::Context(NoCreateT, Int argc, const char** argv) noexcept: _device{}, _context{} {
+    Utility::Arguments args{"magnum",
+        Utility::Arguments::Flag::IgnoreUnknownOptions};
+    args.addOption("log", "default").setHelp("log", "console logging", "default|quiet|verbose")
+        .addOption("disable-extensions").setHelp("disable-extensions", "API extensions to disable", "LIST")
+        .setFromEnvironment("log")
+        .parse(argc, argv);
+
+    /* Decide how to display initialization log */
+    _displayInitializationLog = !(args.value("log") == "quiet" || args.value("log") == "QUIET");
+
+    /* Disable extensions */
+    for(auto&& extension: Utility::String::splitWithoutEmptyParts(args.value("disable-extensions")))
+        _disabledExtensionStrings.push_back(extension);
+}
 
 void Context::create(const Configuration& configuration) {
     if(!tryCreate(configuration)) std::exit(1);
 }
 
 bool Context::tryCreate(const Configuration& configuration) {
-    CORRADE_ASSERT(!_current, "Audio::Context: context already created", false);
+    CORRADE_ASSERT(!currentContext, "Audio::Context: context already created", false);
 
     /* Open the device */
     const ALCchar* const deviceSpecifier = configuration.deviceSpecifier().empty() ? alcGetString(nullptr, ALC_DEFAULT_DEVICE_SPECIFIER) : configuration.deviceSpecifier().data();
@@ -193,7 +228,7 @@ bool Context::tryCreate(const Configuration& configuration) {
     }
 
     alcMakeContextCurrent(_context);
-    _current = this;
+    currentContext = this;
 
     /* Add all extensions to a map for faster lookup */
     std::unordered_map<std::string, Extension> extensionMap;
@@ -206,13 +241,44 @@ bool Context::tryCreate(const Configuration& configuration) {
         const auto found = extensionMap.find(extension);
         if(found != extensionMap.end()) {
             _supportedExtensions.push_back(found->second);
-            _extensionStatus.set(found->second.index());
+            _extensionStatus.set(found->second.index(), true);
         }
     }
 
+    std::ostream* output = _displayInitializationLog ? Debug::output() : nullptr;
+
     /* Print some info */
-    Debug() << "Audio Renderer:" << rendererString() << "by" << vendorString();
-    Debug() << "OpenAL version:" << versionString();
+    Debug{output} << "Audio renderer:" << rendererString() << "by" << vendorString();
+    Debug{output} << "OpenAL version:" << versionString();
+
+    /* Disable extensions as requested by the user */
+    if(!_disabledExtensionStrings.empty()) {
+        bool headerPrinted = false;
+
+        /* Disable extensions that are known and supported and print a message
+           for each */
+        for(auto&& extension: _disabledExtensionStrings) {
+            auto found = extensionMap.find(extension);
+            /* No error message here because some of the extensions could be
+               from Vulkan or OpenGL. That also means we print the header only
+               when we actually have something to say */
+            if(found == extensionMap.end()) continue;
+
+            /* If the extension isn't supported in the first place, don't do
+               anything. If it is, set its status as unsupported but flip the
+               corresponding bit in the disabled bitmap so we know it is
+               supported and only got disabled */
+            if(!_extensionStatus[found->second.index()]) continue;
+            _extensionStatus.set(found->second.index(), false);
+            _disabledExtensions.set(found->second.index(), true);
+
+            if(!headerPrinted) {
+                Debug{output} << "Disabling extensions:";
+                headerPrinted = true;
+            }
+            Debug{output} << "   " << extension;
+        }
+    }
 
     return true;
 }
@@ -220,13 +286,13 @@ bool Context::tryCreate(const Configuration& configuration) {
 Context::Context(Context&& other) noexcept: _device{other._device}, _context{other._context}, _extensionStatus{std::move(other._extensionStatus)}, _supportedExtensions{std::move(other._supportedExtensions)} {
     other._device = nullptr;
     other._context = nullptr;
-    if(_current == &other) _current = this;
+    if(currentContext == &other) currentContext = this;
 }
 
 Context::~Context() {
     if(_context) alcDestroyContext(_context);
     if(_device) alcCloseDevice(_device);
-    if(_current == this) _current = nullptr;
+    if(currentContext == this) currentContext = nullptr;
 }
 
 std::vector<std::string> Context::extensionStrings() const {

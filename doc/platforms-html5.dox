@@ -97,14 +97,14 @@ In case you don't have an OpenGL ES build set up yet, you need to copy
 Magnum source to the `modules/` dir in your project so it is able to find the
 WebGL libraries.
 
-Magnum provides an Emscripten application wrapper in
-@ref Platform::Sdl2Application. See its documentation for more information
-about general usage. You can also use the Emscripten APIs directly or any other
-way.
+Magnum provides Emscripten application wrappers in @ref Platform::Sdl2Application
+and @ref Platform::EmscriptenApplication. See their documentation for more
+information about general usage. You can also use the Emscripten APIs directly
+or any other way.
 
-@note The @ref Platform::Sdl2Application also contains a fully configured
-    bootstrap project that's ready to build and deploy. Check its documentation
-    for details.
+@note @ref Platform::EmscriptenApplication also contains a fully configured
+    bootstrap project that is ready to build and deploy. Check its
+    documentation for details.
 
 To target the web browser, you need to provide a HTML markup for your
 application. Template one is below. The markup references two files,
@@ -198,9 +198,8 @@ EGL and WebGL libraries.
 
 Windowless Magnum apps (i.e. apps that use the OpenGL context without a window)
 can be run in the browser as well using the @ref Platform::WindowlessEglApplication
-class. See its documentation for more information
-about general usage. You can also use the Emscripten APIs directly or any other
-way.
+class. See its documentation for more information about general usage. You can
+also use the Emscripten APIs directly or any other way.
 
 @note @ref Platform::WindowlessEglApplication also contains a fully configured
     bootstrap project that's ready to build and deploy. Check its documentation
@@ -330,7 +329,8 @@ the @cb{.css} div#sizer @ce will center it, following the canvas width. If you
 need more advanced styling, check out [m.css](http://mcss.mosra.cz).
 
 @note It's also possible to modify the container CSS classes from the C++ side
-    using @ref Platform::Sdl2Application::setContainerCssClass().
+    using @ref Platform::EmscriptenApplication::setContainerCssClass() /
+    @ref Platform::Sdl2Application::setContainerCssClass().
 
 @section platforms-html5-events Controlling event behavior
 
@@ -350,8 +350,11 @@ Module.doNotCaptureKeyboard = true;
 </script>
 @endcode
 
-The above is implicitly set for windowless apps, because these don't have any
-event loop.
+The above is implicitly set for @ref Platform::WindowlessEglApplication,
+because it does not have an event loop.
+
+@cb{.js} Module.doNotCaptureKeyboard @ce is not supported by
+@ref Platform::EmscriptenApplication.
 
 Another solution is to specify the element on which it should capture keybard
 using @cb{.js} Module.keyboardListeningElement @ce --- it requires the actual
@@ -367,7 +370,7 @@ like this:
 
 After that, the canvas can be focused with a @m_class{m-label m-default} **Tab**
 key. But because Emscripten eats all mouse input, the `mousedown` event won't
-be propagated to focus the canvas unlesss you do that manually:
+be propagated to focus the canvas unless you do that manually:
 
 @code{.js}
 Module.keyboardListeningElement = Module.canvas;
@@ -505,6 +508,35 @@ location:
 export LLVM=/usr/local/opt/emscripten/libexec/llvm/bin
 @endcode
 
+@subsection platforms-html5-troubleshooting-windows-compiler CMake insists on using Visual C++ as a compiler
+
+On Windows, running CMake as-is without specifying a generator via `-G` will
+always use the Visual Studio compiler and seemingly ignore the Emscripten
+toolchain file altogether. This is because Visual Studio Project Files as the
+default generator on Windows is not able to build for any other system than
+Windows itself. To fix it, use a different generator --- for example
+[Ninja](https://ninja-build.org/). Download the binary, put it somewhere on
+your `PATH` and pass `-G Ninja` to CMake. Alternatively, pass the path to it
+using `-DCMAKE_MAKE_PROGRAM=C:/path/to/ninja.exe`.
+
+@m_class{m-block m-success}
+
+@par Using Ninja that's bundled with Visual Studio
+    If you have Visual Studio with CMake support installed, instead of
+    downloading Ninja yourself, you can make use of the version that's bundled
+    with it. In version 2017 it's in the following location, adjust the path
+    for other versions:
+@par
+    @parblock
+    <!-- gotta love doxygen, making easy things hard and complex things such as
+         applying a class to a nested block element next-to-impossible -->
+    @m_class{m-console-wrap}
+
+    @code{.bat}
+    cmake -G Ninja -DCMAKE_MAKE_PROGRAM=C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe ...
+    @endcode
+    @endparblock
+
 @subsection platforms-html5-troubleshooting-bootstrap First Emscripten run takes long or fails
 
 Emscripten downloads and builds a lot of things on first startup or after
@@ -538,9 +570,11 @@ em++ -s WASM=1 main.cpp
 After this step it might be also needed to purge all CMake build directories
 and set them up again to ensure no bad state got cached.
 
-@subsection platforms-html5-troubleshooting-corrade-not-found CMake can't find _CORRADE_MODULE_DIR
+@subsection platforms-html5-troubleshooting-corrade-not-found CMake can't find CORRADE_INCLUDE_DIR, _CORRADE_CONFIGURE_FILE or _CORRADE_MODULE_DIR
 
-If initial CMake configuration fails with
+If you set `CMAKE_INSTALL_PREFIX` to a path contained in `EMSCRIPTEN_TOOLCHAIN_PATH` (which is specified in the toolchain file) and
+dependencies are installed there as well, things should "just work". In other
+cases you might end up with variants of the following error:
 
 @code{.shell-session}
   Could NOT find Corrade (missing: _CORRADE_MODULE_DIR)
@@ -556,7 +590,7 @@ cmake .. \
     -DCMAKE_TOOLCHAIN_FILE=../toolchains/generic/Emscripten-wasm.cmake \
     -DCMAKE_PREFIX_PATH=/your/emscripten/libs/ \
     -DCMAKE_FIND_ROOT_PATH=/your/emscripten/libs/ \
-    -G Ninja
+    ...
 @endcode
 
 @subsection platforms-html5-troubleshooting-loading-failed Application fails to load
@@ -620,8 +654,10 @@ JavaScript code. Using them in C++ sources triggers a warning from Clang:
 warning: '$' in identifier
 @endcode
 
-Solution is to disable the warning for the offending lines, here for example
-when modifying a title element contents through DOM:
+Solution is to disable the warning for the offending lines, below for example
+when modifying a title element contents through DOM. No @cpp #ifdef __clang__ @ce
+is necessary, as the code in question is only ever compiled by Emscripten's
+Clang anyway:
 
 @snippet platforms-html5.cpp emasm-dollar
 

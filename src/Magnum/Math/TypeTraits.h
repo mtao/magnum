@@ -250,20 +250,36 @@ namespace Implementation {
     };
     template<class T> struct UnderlyingType<Deg<T>> { typedef T Type; };
     template<class T> struct UnderlyingType<Rad<T>> { typedef T Type; };
+    template<std::size_t size, class T> struct UnderlyingType<Vector<size, T>> {
+        typedef T Type;
+    };
+    template<class T> struct UnderlyingType<Vector2<T>> { typedef T Type; };
+    template<class T> struct UnderlyingType<Vector3<T>> { typedef T Type; };
+    template<class T> struct UnderlyingType<Vector4<T>> { typedef T Type; };
+    template<class T> struct UnderlyingType<Color3<T>> { typedef T Type; };
+    template<class T> struct UnderlyingType<Color4<T>> { typedef T Type; };
+    template<std::size_t cols, std::size_t rows, class T> struct UnderlyingType<RectangularMatrix<cols, rows, T>> {
+        typedef T Type;
+    };
+    template<std::size_t size, class T> struct UnderlyingType<Matrix<size, T>> {
+        typedef T Type;
+    };
+    template<class T> struct UnderlyingType<Matrix3<T>> { typedef T Type; };
+    template<class T> struct UnderlyingType<Matrix4<T>> { typedef T Type; };
 }
 
 /**
-@brief Underlying builtin type for a scalar type
+@brief Underlying type of a math type
 
-For builtin types returns the type itself, for wrapped types like @ref Deg or
-@ref Rad returns the underlying builtin type. It's guaranteed that the input
-type is always explicitly convertible to the output type and the output type
-is usable with standard APIs such as @ref std::isinf().
+For builtin scalar types returns the type itself, for wrapped types like
+@ref Deg or @ref Rad returns the underlying builtin type, for vector and matrix
+types the type of their components.
 
-Passed types are required to satisfy @ref IsScalar. All non-scalar Magnum math
-types have a member @cpp typedef @ce ``Type`` containing the underlying type.
+For scalar types it's guaranteed that the input type is always explicitly
+convertible to the output type and the output type is usable with standard APIs
+such as @ref std::isinf().
 */
-template<class T> using UnderlyingTypeOf =  typename Implementation::UnderlyingType<T>::Type;
+template<class T> using UnderlyingTypeOf = typename Implementation::UnderlyingType<T>::Type;
 
 namespace Implementation {
     template<class T> struct TypeTraitsDefault {
@@ -327,6 +343,7 @@ template<class T> struct TypeTraits: Implementation::TypeTraitsDefault<T> {
      * Uses fuzzy compare for floating-point types (using @ref epsilon()
      * value), pure equality comparison everywhere else. Algorithm adapted from
      * http://floating-point-gui.de/errors/comparison/.
+     * @see @ref Math::equal(T, T), @ref Math::notEqual(T, T)
      */
     static bool equals(T a, T b);
 
@@ -344,6 +361,28 @@ template<class T> struct TypeTraits: Implementation::TypeTraitsDefault<T> {
     static bool equalsZero(T a, T magnitude);
     #endif
 };
+
+/**
+@brief Equality comparison of scalar types
+
+Calls @ref TypeTraits<T>::equals() --- using fuzzy compare for floating-point
+types and doing equality comparison on integral types. Scalar complement to
+@ref equal(const Vector<size, T>& a, const Vector<size, T>&).
+*/
+template<class T> inline typename std::enable_if<IsScalar<T>::value, bool>::type equal(T a, T b) {
+    return TypeTraits<T>::equals(a, b);
+}
+
+/**
+@brief Non-equality comparison of scalar types
+
+Calls @ref TypeTraits<T>::equals() --- using fuzzy compare for floating-point
+types and doing equality comparison on integral types. Scalar complement to
+@ref notEqual(const Vector<size, T>& a, const Vector<size, T>&).
+*/
+template<class T> inline typename std::enable_if<IsScalar<T>::value, bool>::type notEqual(T a, T b) {
+    return !TypeTraits<T>::equals(a, b);
+}
 
 /* Integral scalar types */
 namespace Implementation {

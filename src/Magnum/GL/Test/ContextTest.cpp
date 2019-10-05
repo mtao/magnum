@@ -23,11 +23,13 @@
     DEALINGS IN THE SOFTWARE.
 */
 
+#include <set>
 #include <sstream>
 #include <Corrade/TestSuite/Tester.h>
 #include <Corrade/Utility/DebugStl.h>
 
 #include "Magnum/GL/Context.h"
+#include "Magnum/GL/Extensions.h"
 #include "Magnum/GL/Version.h"
 
 namespace Magnum { namespace GL { namespace Test { namespace {
@@ -37,6 +39,8 @@ struct ContextTest: TestSuite::Tester {
 
     void constructNoCreate();
     void constructCopyMove();
+
+    void makeCurrentNoOp();
 
     void extensions();
 
@@ -50,6 +54,8 @@ struct ContextTest: TestSuite::Tester {
 ContextTest::ContextTest() {
     addTests({&ContextTest::constructNoCreate,
               &ContextTest::constructCopyMove,
+
+              &ContextTest::makeCurrentNoOp,
 
               &ContextTest::extensions,
 
@@ -82,10 +88,20 @@ void ContextTest::constructCopyMove() {
     CORRADE_VERIFY(!(std::is_assignable<Context, Context&&>{}));
 }
 
+void ContextTest::makeCurrentNoOp() {
+    CORRADE_VERIFY(!Context::hasCurrent());
+    Context::makeCurrent(nullptr);
+    CORRADE_VERIFY(!Context::hasCurrent());
+}
+
 void ContextTest::extensions() {
     const char* used[GL::Implementation::ExtensionCount]{};
 
-    /* Check that all extension indices are unique */
+    std::set<std::string> unique;
+
+    /* Check that all extension indices are unique, are in correct lists, are
+       not compiled on versions that shouldn't have them, are listed just once
+       etc. */
     for(Version version: {
         #ifndef MAGNUM_TARGET_GLES
         Version::GL300,
@@ -123,6 +139,39 @@ void ContextTest::extensions() {
             }
 
             used[e.index()] = e.string();
+            if(!unique.insert(e.string()).second) {
+                Error{} << "Extension" << e.string() << "listed more than once";
+                CORRADE_VERIFY(false);
+            }
+
+            CORRADE_VERIFY(Int(e.coreVersion()) >= Int(e.requiredVersion()));
+            if(e.coreVersion() != version
+                #if defined(MAGNUM_TARGET_GLES2) && defined(MAGNUM_TARGET_WEBGL)
+                /* These two are replaced by EXT_color_buffer_float for 2.0,
+                   but aren't core in WebGL 2 */
+                && e.index() != Extensions::EXT::color_buffer_half_float::Index
+                && e.index() != Extensions::WEBGL::color_buffer_float::Index
+                #endif
+            ) {
+                Error{} << "Extension" << e.string() << "should have core version"
+                    << version << "but has" << e.coreVersion();
+                CORRADE_VERIFY(false);
+            }
+
+            #ifdef MAGNUM_TARGET_GLES2
+            if(e.requiredVersion() != Version::GLES200) {
+                Error{} << "Extension" << e.string() << "should have required version"
+                    << Version::GLES200 << "but has" << e.requiredVersion();
+                CORRADE_VERIFY(false);
+            }
+            #endif
+
+            #if defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_GLES2)
+            if(e.coreVersion() == Version::GLES300 && e.index() != Extensions::MAGNUM::shader_vertex_id::Index) {
+                Error{} << "Extension" << e.string() << "has core version" << e.coreVersion() << "on a GLES3 build -- it shouldn't be present at all";
+                CORRADE_VERIFY(false);
+            }
+            #endif
         }
     }
 

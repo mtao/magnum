@@ -78,6 +78,8 @@ template<class T> struct Constants {
      * @brief @f$ \tau @f$.
      *
      * Or two pi. See the [Tau manifesto](https://www.tauday.com/tau-manifesto).
+     * If you think this is wrong, note that
+     * [Python has it too](https://www.python.org/dev/peps/pep-0628/).
      *
      * @f[
      *      \tau = 2 \pi = 360 \degree
@@ -145,17 +147,31 @@ template<class> struct Constants;
 #endif
 
 #ifndef DOXYGEN_GENERATING_OUTPUT
+#ifndef CORRADE_TARGET_EMSCRIPTEN
+template<> struct Constants<long double> {
+    /* Needed by Deg->Rad conversion, which is needed by a test for
+       __builtin_sincos. Hopefully nobody else needs those, so it's just pi.
+       21-digit string representation gives back the same value on rountrip.
+       https://en.wikipedia.org/wiki/Extended_precision#Working_range
+       Value taken using Wolfram Alpha.          1.23456789012345678901 */
+    static constexpr long double pi()   { return 3.14159265358979323846l; }
+};
+#endif
+
 template<> struct Constants<Double> {
     Constants() = delete;
 
-    static constexpr Double pi()        { return 3.141592653589793; }
-    static constexpr Double piHalf()    { return 1.570796326794897; }
-    static constexpr Double piQuarter() { return 0.785398163397448; }
-    static constexpr Double tau()       { return 6.283185307179586; }
-    static constexpr Double e()         { return 2.718281828459045; }
-    static constexpr Double sqrt2()     { return 1.414213562373095; }
-    static constexpr Double sqrt3()     { return 1.732050807568877; }
-    static constexpr Double sqrtHalf()  { return 0.707106781186547; }
+    /* 17-digit string representation gives back the same value on rountrip.
+       https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+       Values taken using Wolfram Alpha.         1.2345678901234567 */
+    static constexpr Double pi()        { return 3.1415926535897932; }
+    static constexpr Double piHalf()    { return 1.5707963267948966; }
+    static constexpr Double piQuarter() { return 0.7853981633974483; }
+    static constexpr Double tau()       { return 6.2831853071795864; }
+    static constexpr Double e()         { return 2.7182818284590452; }
+    static constexpr Double sqrt2()     { return 1.4142135623730950; }
+    static constexpr Double sqrt3()     { return 1.7320508075688773; }
+    static constexpr Double sqrtHalf()  { return 0.7071067811865475; }
 
     static constexpr Double nan()   { return Double(NAN); }
     static constexpr Double inf()   { return HUGE_VAL; }
@@ -163,6 +179,9 @@ template<> struct Constants<Double> {
 template<> struct Constants<Float> {
     Constants() = delete;
 
+    /* 9-digit string representation gives back the same value on rountrip.
+       https://en.wikipedia.org/wiki/Single-precision_floating-point_format
+       Values rounded from the above.            1.23456789 */
     static constexpr Float pi()         { return 3.141592654f; }
     static constexpr Float piHalf()     { return 1.570796327f; }
     static constexpr Float piQuarter()  { return 0.785398163f; }

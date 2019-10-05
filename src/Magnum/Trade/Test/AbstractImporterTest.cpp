@@ -30,6 +30,7 @@
 #include <Corrade/Utility/DebugStl.h>
 #include <Corrade/Utility/Directory.h>
 
+#include "Magnum/PixelFormat.h"
 #include "Magnum/FileCallback.h"
 #include "Magnum/Trade/AbstractImporter.h"
 #include "Magnum/Trade/AnimationData.h"
@@ -1068,13 +1069,15 @@ void AbstractImporterTest::sceneNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doSceneCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.sceneName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::sceneName(): index out of range\n");
+    importer.sceneName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::sceneName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::sceneNotImplemented() {
@@ -1112,13 +1115,15 @@ void AbstractImporterTest::sceneOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doSceneCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.scene(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::scene(): index out of range\n");
+    importer.scene(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::scene(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::animation() {
@@ -1233,13 +1238,15 @@ void AbstractImporterTest::animationNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doAnimationCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.animationName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::animationName(): index out of range\n");
+    importer.animationName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::animationName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::animationNotImplemented() {
@@ -1277,13 +1284,15 @@ void AbstractImporterTest::animationOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doAnimationCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.animation(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::animation(): index out of range\n");
+    importer.animation(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::animation(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::light() {
@@ -1398,13 +1407,15 @@ void AbstractImporterTest::lightNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doLightCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.lightName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::lightName(): index out of range\n");
+    importer.lightName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::lightName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::lightNotImplemented() {
@@ -1442,13 +1453,15 @@ void AbstractImporterTest::lightOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doLightCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.light(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::light(): index out of range\n");
+    importer.light(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::light(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::camera() {
@@ -1563,13 +1576,15 @@ void AbstractImporterTest::cameraNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doCameraCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.cameraName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::cameraName(): index out of range\n");
+    importer.cameraName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::cameraName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::cameraNotImplemented() {
@@ -1607,13 +1622,15 @@ void AbstractImporterTest::cameraOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doCameraCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.camera(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::camera(): index out of range\n");
+    importer.camera(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::camera(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::object2D() {
@@ -1728,13 +1745,15 @@ void AbstractImporterTest::object2DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doObject2DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.object2DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object2DName(): index out of range\n");
+    importer.object2DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object2DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::object2DNotImplemented() {
@@ -1772,13 +1791,15 @@ void AbstractImporterTest::object2DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doObject2DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.object2D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object2D(): index out of range\n");
+    importer.object2D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object2D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::object3D() {
@@ -1893,13 +1914,15 @@ void AbstractImporterTest::object3DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doObject3DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.object3DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object3DName(): index out of range\n");
+    importer.object3DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object3DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::object3DNotImplemented() {
@@ -1937,13 +1960,15 @@ void AbstractImporterTest::object3DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doObject3DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.object3D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object3D(): index out of range\n");
+    importer.object3D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::object3D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::mesh2D() {
@@ -2058,13 +2083,15 @@ void AbstractImporterTest::mesh2DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doMesh2DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.mesh2DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh2DName(): index out of range\n");
+    importer.mesh2DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh2DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::mesh2DNotImplemented() {
@@ -2102,13 +2129,15 @@ void AbstractImporterTest::mesh2DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doMesh2DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.mesh2D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh2D(): index out of range\n");
+    importer.mesh2D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh2D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::mesh3D() {
@@ -2223,13 +2252,15 @@ void AbstractImporterTest::mesh3DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doMesh3DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.mesh3DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh3DName(): index out of range\n");
+    importer.mesh3DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh3DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::mesh3DNotImplemented() {
@@ -2267,13 +2298,15 @@ void AbstractImporterTest::mesh3DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doMesh3DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.mesh3D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh3D(): index out of range\n");
+    importer.mesh3D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::mesh3D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::material() {
@@ -2388,13 +2421,15 @@ void AbstractImporterTest::materialNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doMaterialCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.materialName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::materialName(): index out of range\n");
+    importer.materialName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::materialName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::materialNotImplemented() {
@@ -2432,13 +2467,15 @@ void AbstractImporterTest::materialOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doMaterialCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.material(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::material(): index out of range\n");
+    importer.material(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::material(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::texture() {
@@ -2553,13 +2590,15 @@ void AbstractImporterTest::textureNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doTextureCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.textureName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::textureName(): index out of range\n");
+    importer.textureName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::textureName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::textureNotImplemented() {
@@ -2597,13 +2636,15 @@ void AbstractImporterTest::textureOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doTextureCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.texture(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::texture(): index out of range\n");
+    importer.texture(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::texture(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::image1D() {
@@ -2622,13 +2663,10 @@ void AbstractImporterTest::image1D() {
             else return {};
         }
         Containers::Optional<ImageData1D> doImage1D(UnsignedInt id) override {
-            if(id == 7) return ImageData1D{PixelStorage{}, {}, {}, {}, &state};
+            if(id == 7) return ImageData1D{PixelFormat::RGBA8Unorm, {}, {}, &state};
             else return {};
         }
     } importer;
-
-    std::ostringstream out;
-    Error redirectError{&out};
 
     CORRADE_COMPARE(importer.image1DCount(), 8);
     CORRADE_COMPARE(importer.image1DForName("eighth"), 7);
@@ -2718,13 +2756,15 @@ void AbstractImporterTest::image1DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doImage1DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.image1DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image1DName(): index out of range\n");
+    importer.image1DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image1DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::image1DNotImplemented() {
@@ -2762,13 +2802,15 @@ void AbstractImporterTest::image1DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doImage1DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.image1D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image1D(): index out of range\n");
+    importer.image1D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image1D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::image2D() {
@@ -2787,13 +2829,10 @@ void AbstractImporterTest::image2D() {
             else return {};
         }
         Containers::Optional<ImageData2D> doImage2D(UnsignedInt id) override {
-            if(id == 7) return ImageData2D{PixelStorage{}, {}, {}, {}, &state};
+            if(id == 7) return ImageData2D{PixelFormat::RGBA8Unorm, {}, {}, &state};
             else return {};
         }
     } importer;
-
-    std::ostringstream out;
-    Error redirectError{&out};
 
     CORRADE_COMPARE(importer.image2DCount(), 8);
     CORRADE_COMPARE(importer.image2DForName("eighth"), 7);
@@ -2883,13 +2922,15 @@ void AbstractImporterTest::image2DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doImage2DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.image2DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image2DName(): index out of range\n");
+    importer.image2DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image2DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::image2DNotImplemented() {
@@ -2927,13 +2968,15 @@ void AbstractImporterTest::image2DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doImage2DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.image2D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image2D(): index out of range\n");
+    importer.image2D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image2D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::image3D() {
@@ -2952,13 +2995,10 @@ void AbstractImporterTest::image3D() {
             else return {};
         }
         Containers::Optional<ImageData3D> doImage3D(UnsignedInt id) override {
-            if(id == 7) return ImageData3D{PixelStorage{}, {}, {}, {}, &state};
+            if(id == 7) return ImageData3D{PixelFormat::RGBA8Unorm, {}, {}, &state};
             else return {};
         }
     } importer;
-
-    std::ostringstream out;
-    Error redirectError{&out};
 
     CORRADE_COMPARE(importer.image3DCount(), 8);
     CORRADE_COMPARE(importer.image3DForName("eighth"), 7);
@@ -3048,13 +3088,15 @@ void AbstractImporterTest::image3DNameOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doImage3DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.image3DName(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image3DName(): index out of range\n");
+    importer.image3DName(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image3DName(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::image3DNotImplemented() {
@@ -3092,13 +3134,15 @@ void AbstractImporterTest::image3DOutOfRange() {
         Features doFeatures() const override { return {}; }
         bool doIsOpened() const override { return true; }
         void doClose() override {}
+
+        UnsignedInt doImage3DCount() const override { return 8; }
     } importer;
 
     std::ostringstream out;
     Error redirectError{&out};
 
-    importer.image3D(0);
-    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image3D(): index out of range\n");
+    importer.image3D(8);
+    CORRADE_COMPARE(out.str(), "Trade::AbstractImporter::image3D(): index 8 out of range for 8 entries\n");
 }
 
 void AbstractImporterTest::importerState() {

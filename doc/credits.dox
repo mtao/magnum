@@ -99,8 +99,12 @@ Are the below lists missing your name or something's wrong?
 -   **[\@biosek](https://github.com/biosek)** --- documentation fixes
 -   **Borislav Stanimirov** ([\@iboB](https://github.com/iboB)) --- strict
     weak ordering for @ref Math types
+-   **Cameron Egbert** ([\@cegbertOculus](https://github.com/cegbertOculus))
+    --- fixes to Windows HiDPI support
 -   **Daniel Bloor** ([\@Bluer01](https://github.com/Bluer01)) --- setting old
     code on fire
+-   **Daniel Guzman** ([\@roig](https://github.com/roig)) --- improvements to
+    @ref ResourceManager
 -   **Denis Igorevich Lobanov** ([\@denislobanov](https://github.com/denislobanov))
     --- math fixes
 -   **[\@dlardi](https://github.com/dlardi)** --- WGL-related bugfixes
@@ -110,6 +114,8 @@ Are the below lists missing your name or something's wrong?
     updates, algorithm bugfixes
 -   **Erik Wijmans** ([\@erikwijmans](https://github.com/erikwijmans)) ---
     NVidia-specific workarounds for headless EGL contexts
+-   **Florian Goujeon** ([\@fgoujeon](https://github.com/fgoujeon)) --- iOS
+    fixes in the @ref Shaders library
 -   **Gerhard de Clercq** --- Windows RT (Store/Phone) port
 -   **Guillaume Giraud** ([\@Guillaume227](https://github.com/Guillaume227)) ---
     algorithm bugfixes
@@ -121,10 +127,13 @@ Are the below lists missing your name or something's wrong?
     improvements to @cb{.cmake} android_create_apk() @ce
 -   **Ivan P.** ([\@uzername](https://github.com/uzername)) --- documentation
     improvements
--   **Jonathan Hale** ([\@Squareys](https://github.com/Squareys)) --- @ref Audio
-    library enhancements, @ref Platform::GlfwApplication implementation,
-    frustum and cone culling, bug reports, Windows build improvements,
-    documentation improvements and tons of other stuff
+-   **Jan Dupal** ([\@JanDupal](https://github.com/JanDupal)) --- Homebrew
+    package for `magnum-bindings`
+-   **Jonathan Hale** ([\@Squareys](https://github.com/Squareys)) ---
+    @ref Audio library enhancements, @ref Platform::GlfwApplication and
+    @ref Platform::EmscriptenApplication implementation, frustum and cone
+    culling, bug reports, Windows build improvements, documentation
+    improvements and tons of other stuff
 -   **Joel Clay** ([\@jclay](https://github.com/jclay)) --- Vcpkg packages
 -   **Konstantinos Chatzilygeroudis** ([\@costashatz](https://github.com/costashatz))
     --- Debian package
@@ -132,12 +141,17 @@ Are the below lists missing your name or something's wrong?
     fixes
 -   **Leon Moctezuma** ([\@leonidax](https://github.com/leonidax)) ---
     bugreports, API design direction
+-   **Mandeep Singh Baines** ([\@msbaines](https://github.com/msbaines)) ---
+    WebGL 2 build fixes
 -   **Max Schwarz** ([\@xqms](https://github.com/xqms)) --- `Any*` plugin
     improvements, fixes in the @ref GL library
+-   **Michael Tao** ([\@mtao](https://github.com/mtao)) --- Gentoo build fixes
 -   **Miguel Martin** ([\@miguelmartin75](https://github.com/miguelmartin75))
     --- initial macOS port, various other improvements
 -   **Nathan Ollerenshaw** ([\@matjam](https://github.com/matjam)) --- Ubuntu
     packages in a PPA repository
+-   **Nick Skelsey** ([\@NSkelsey](https://github.com/NSkelsey)) ---
+    documentation copy-editing
 -   **Nicholas "LB" Branden** ([\@LB--](https://github.com/LB--)) --- warning
     fixes, Windows buildsystem improvements
 -   **Olga Turanksaya** ([\@olga-python](https://github.com/olga-python)) ---

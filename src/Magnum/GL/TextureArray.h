@@ -503,7 +503,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
 
         #ifndef MAGNUM_TARGET_GLES
         /**
-         * @brief @copybrief Texture::image(Int, Image&)
+         * @brief Read given texture mip level to an image
          *
          * See @ref Texture::image(Int, Image&) for more information.
          * @requires_gl Texture image queries are not available in OpenGL ES or
@@ -523,7 +523,18 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         Image<dimensions+1> image(Int level, Image<dimensions+1>&& image);
 
         /**
-         * @brief @copybrief Texture::image(Int, BufferImage&, BufferUsage)
+         * @brief Read given texture mip level to an image view
+         *
+         * Compared to @ref image(Int, Image<dimensions+1>&) the function reads
+         * the pixels into the memory provided by @p image, expecting it's not
+         * @cpp nullptr @ce and its size is the same as size of given @p level.
+         */
+        void image(Int level, const BasicMutableImageView<dimensions+1>& image) {
+            AbstractTexture::image<dimensions+1>(level, image);
+        }
+
+        /**
+         * @brief Read given texture mip level to a buffer image
          *
          * See @ref Texture::image(Int, BufferImage&, BufferUsage) for more
          * information.
@@ -544,7 +555,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         BufferImage<dimensions+1> image(Int level, BufferImage<dimensions+1>&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::compressedImage(Int, CompressedImage&)
+         * @brief Read given compressed texture mip level to an image
          *
          * See @ref Texture::compressedImage(Int, CompressedImage&) for more
          * information.
@@ -567,7 +578,19 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         CompressedImage<dimensions+1> compressedImage(Int level, CompressedImage<dimensions+1>&& image);
 
         /**
-         * @brief @copybrief Texture::compressedImage(Int, CompressedBufferImage&, BufferUsage)
+         * @brief Read given compressed texture mip level to an image view
+         *
+         * Compared to @ref compressedImage(Int, CompressedImage<dimensions+1>&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as size of given @p level.
+         */
+        void compressedImage(Int level, const BasicMutableCompressedImageView<dimensions+1>& image) {
+            AbstractTexture::compressedImage<dimensions+1>(level, image);
+        }
+
+        /**
+         * @brief Read given compressed texture mip level to a buffer image
          *
          * See @ref Texture::compressedImage(Int, CompressedBufferImage&, BufferUsage)
          * for more information.
@@ -590,7 +613,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         CompressedBufferImage<dimensions+1> compressedImage(Int level, CompressedBufferImage<dimensions+1>&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, Image&)
+         * @brief Read a range of given texture mip level to an image
          *
          * See @ref Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, Image&)
          * for more information.
@@ -612,7 +635,19 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         Image<dimensions+1> subImage(Int level, const RangeTypeFor<dimensions+1, Int>& range, Image<dimensions+1>&& image);
 
         /**
-         * @brief @copybrief Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, BufferImage&, BufferUsage)
+         * @brief Read a range of given texture mip level to an image view
+         *
+         * Compared to @ref subImage(Int, const RangeTypeFor<dimensions+1, Int>&, Image<dimensions+1>&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce and its size is the same as
+         * @p range size.
+         */
+        void subImage(Int level, const RangeTypeFor<dimensions+1, Int>& range, const BasicMutableImageView<dimensions+1>& image) {
+            AbstractTexture::subImage<dimensions+1>(level, range, image);
+        }
+
+        /**
+         * @brief Read a range of given texture mip level to a buffer image
          *
          * See @ref Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, BufferImage&, BufferUsage)
          * for more information.
@@ -634,7 +669,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         BufferImage<dimensions+1> subImage(Int level, const RangeTypeFor<dimensions+1, Int>& range, BufferImage<dimensions+1>&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage&)
+         * @brief Read a range of given compressed texture mip level to an image
          *
          * See @ref Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage&)
          * for more information.
@@ -662,7 +697,19 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
         CompressedImage<dimensions+1> compressedSubImage(Int level, const RangeTypeFor<dimensions+1, Int>& range, CompressedImage<dimensions+1>&& image);
 
         /**
-         * @brief @copybrief Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedBufferImage&, BufferUsage)
+         * @brief Read a range of given compressed texture mip level to an image view
+         *
+         * Compared to @ref compressedSubImage(Int, const RangeTypeFor<dimensions+1, Int>&, CompressedImage<dimensions+1>&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as @p range size.
+         */
+        void compressedSubImage(Int level, const RangeTypeFor<dimensions+1, Int>& range, const BasicMutableCompressedImageView<dimensions+1>& image) {
+            AbstractTexture::compressedSubImage<dimensions+1>(level, range, image);
+        }
+
+        /**
+         * @brief Read a range of given compressed texture mip level to a buffer image
          *
          * See @ref Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedBufferImage&, BufferUsage)
          * for more information.
@@ -699,7 +746,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
          * @deprecated_gl Prefer to use @ref setStorage() and @ref setSubImage()
          *      instead.
          */
-        TextureArray<dimensions>& setImage(Int level, TextureFormat internalFormat, const ImageView<dimensions+1>& image) {
+        TextureArray<dimensions>& setImage(Int level, TextureFormat internalFormat, const BasicImageView<dimensions+1>& image) {
             DataHelper<dimensions+1>::setImage(*this, level, internalFormat, image);
             return *this;
         }
@@ -734,7 +781,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
          * @deprecated_gl Prefer to use @ref setStorage() and
          *      @ref setCompressedSubImage() instead.
          */
-        TextureArray<dimensions>& setCompressedImage(Int level, const CompressedImageView<dimensions+1>& image) {
+        TextureArray<dimensions>& setCompressedImage(Int level, const BasicCompressedImageView<dimensions+1>& image) {
             DataHelper<dimensions+1>::setCompressedImage(*this, level, image);
             return *this;
         }
@@ -781,7 +828,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
          *      eventually @fn_gl{ActiveTexture}, @fn_gl{BindTexture} and
          *      @fn_gl_keyword{TexSubImage2D} / @fn_gl_keyword{TexSubImage3D}
          */
-        TextureArray<dimensions>& setSubImage(Int level, const VectorTypeFor<dimensions+1, Int>& offset, const ImageView<dimensions+1>& image) {
+        TextureArray<dimensions>& setSubImage(Int level, const VectorTypeFor<dimensions+1, Int>& offset, const BasicImageView<dimensions+1>& image) {
             DataHelper<dimensions+1>::setSubImage(*this, level, offset, image);
             return *this;
         }
@@ -818,7 +865,7 @@ template<UnsignedInt dimensions> class TextureArray: public AbstractTexture {
          * @requires_gl Non-default @ref CompressedPixelStorage is not
          *      available in OpenGL ES and WebGL.
          */
-        TextureArray<dimensions>& setCompressedSubImage(Int level, const VectorTypeFor<dimensions+1, Int>& offset, const CompressedImageView<dimensions+1>& image) {
+        TextureArray<dimensions>& setCompressedSubImage(Int level, const VectorTypeFor<dimensions+1, Int>& offset, const BasicCompressedImageView<dimensions+1>& image) {
             DataHelper<dimensions+1>::setCompressedSubImage(*this, level, offset, image);
             return *this;
         }

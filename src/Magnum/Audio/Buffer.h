@@ -5,6 +5,7 @@
 
     Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019
               Vladimír Vondruš <mosra@centrum.cz>
+    Copyright © 2019 Guillaume Jacquemin <williamjcm@users.noreply.github.com>
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -29,6 +30,7 @@
  * @brief Class @ref Magnum::Audio::Buffer
  */
 
+#include <climits>
 #include <utility>
 #include <al.h>
 #include <alc.h>
@@ -48,7 +50,7 @@
 namespace Magnum { namespace Audio {
 
 /** @brief Sample buffer */
-class Buffer {
+class MAGNUM_AUDIO_EXPORT Buffer {
     public:
         #ifdef MAGNUM_BUILD_DEPRECATED
         /** @brief @copybrief BufferFormat
@@ -100,6 +102,108 @@ class Buffer {
         Buffer& setData(BufferFormat format, Containers::ArrayView<const void> data, ALsizei frequency) {
             alBufferData(_id, ALenum(format), data, data.size(), frequency);
             return *this;
+        }
+
+        /**
+         * @brief Buffer size in bytes
+         *
+         * @see @ref channels(), @ref bitDepth(), @ref sampleCount()
+         */
+        Int size() const {
+            Int size;
+            alGetBufferi(_id, AL_SIZE, &size);
+            return size;
+        }
+
+        /**
+         * @brief Buffer channel count
+         *
+         * @see @ref size(), @ref bitDepth(), @ref sampleCount()
+         */
+        Int channels() const {
+            ALint channels;
+            alGetBufferi(_id, AL_CHANNELS, &channels);
+            return channels;
+        }
+
+        /**
+         * @brief Buffer bit depth
+         *
+         * @see @ref size(), @ref channels(), @ref sampleCount()
+         */
+        Int bitDepth() const {
+            ALint bitDepth;
+            alGetBufferi(_id, AL_BITS, &bitDepth);
+            return bitDepth;
+        }
+
+        /**
+         * @brief Buffer sample count
+         *
+         * Calculated from @ref size(), @ref channels() and @ref bitDepth().
+         */
+        Int sampleCount() const { return size()*8/(channels()*bitDepth()); }
+
+        /**
+         * @brief Get buffer loop points
+         * @return A @ref std::pair containing the start and end loop points
+         *
+         * @requires_al_extension Extension @al_extension{SOFT,loop_points}
+         */
+        std::pair<Int, Int> loopPoints() const {
+            std::pair<Int, Int> points{0, 0};
+            alGetBufferiv(_id, AL_LOOP_POINTS_SOFT, &(points.first));
+            return points;
+        }
+
+        /**
+         * @brief Set buffer loop points
+         * @param loopStart The loop's start point in samples
+         * @param loopEnd   The loop's end point in samples
+         * @return Reference to self (for method chaining)
+         *
+         * The buffer needs to not be attached to a source for this operation
+         * to succeed.
+         * @requires_al_extension Extension @al_extension{SOFT,loop_points}
+         */
+        Buffer& setLoopPoints(Int loopStart, Int loopEnd);
+
+        /**
+         * @brief Set buffer to loop from the beginning until a certain point
+         * @param loopEnd   The loop's end point in samples
+         * @return Reference to self (for method chaining)
+         *
+         * Equivalent to calling @ref setLoopPoints() with @p loopStart equal
+         * to @cpp 0 @ce.
+         * @requires_al_extension Extension @al_extension{SOFT,loop_points}
+         */
+        Buffer& setLoopUntil(Int loopEnd) {
+            return setLoopPoints(0, loopEnd);
+        }
+
+        /**
+         * @brief Set buffer to loop from the a certain point until the end
+         * @param loopStart The loop's start point in samples
+         * @return Reference to self (for method chaining)
+         *
+         * Equivalent to calling @ref setLoopPoints() with @p loopEnd equal to
+         * @cpp INT_MAX @ce.
+         * @requires_al_extension Extension @al_extension{SOFT,loop_points}
+         */
+        Buffer& setLoopSince(Int loopStart) {
+            return setLoopPoints(loopStart, INT_MAX);
+        }
+
+        /**
+         * @brief Resets the loop points
+         * @return Reference to self (for method chaining)
+         *
+         * Equivalent to calling @ref setLoopPoints() with @p loopStart equal
+         * to @cpp 0 @ce, and @p loopEnd equal to @cpp INT_MAX @ce.
+         * @requires_al_extension Extension @al_extension{SOFT,loop_points}
+         */
+        Buffer& resetLoopPoints() {
+            return setLoopPoints(0, INT_MAX);
         }
 
     private:

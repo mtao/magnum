@@ -32,15 +32,23 @@
 #include "Magnum/Primitives/visibility.h"
 #include "Magnum/Trade/Trade.h"
 
-#ifdef MAGNUM_BUILD_DEPRECATED
-#include <Corrade/Utility/Macros.h>
-#endif
-
 namespace Magnum { namespace Primitives {
 
 /**
+@brief Whether to generate circle texture coordinates
+
+@see @ref circle2DSolid(), @ref circle3DSolid()
+*/
+enum class CircleTextureCoords: UnsignedByte {
+    DontGenerate,       /**< Don't generate texture coordinates */
+    Generate            /**< Generate texture coordinates */
+};
+
+/**
 @brief Solid 2D circle
-@param segments  Number of segments. Must be greater or equal to @cpp 3 @ce.
+@param segments         Number of segments. Must be greater or equal to
+    @cpp 3 @ce.
+@param textureCoords    Whether to generate texture coordinates
 
 Circle with radius @cpp 1.0f @ce. Non-indexed @ref MeshPrimitive::TriangleFan.
 
@@ -48,11 +56,12 @@ Circle with radius @cpp 1.0f @ce. Non-indexed @ref MeshPrimitive::TriangleFan.
 
 @see @ref circle2DWireframe(), @ref circle3DSolid()
 */
-MAGNUM_PRIMITIVES_EXPORT Trade::MeshData2D circle2DSolid(UnsignedInt segments);
+MAGNUM_PRIMITIVES_EXPORT Trade::MeshData2D circle2DSolid(UnsignedInt segments, CircleTextureCoords textureCoords = CircleTextureCoords::DontGenerate);
 
 /**
 @brief Wireframe 2D circle
-@param segments  Number of segments. Must be greater or equal to @cpp 3 @ce.
+@param segments         Number of segments. Must be greater or equal to
+    @cpp 3 @ce.
 
 Circle with radius @cpp 1.0f @ce. Non-indexed @ref MeshPrimitive::LineLoop.
 
@@ -62,27 +71,11 @@ Circle with radius @cpp 1.0f @ce. Non-indexed @ref MeshPrimitive::LineLoop.
 */
 MAGNUM_PRIMITIVES_EXPORT Trade::MeshData2D circle2DWireframe(UnsignedInt segments);
 
-#ifdef MAGNUM_BUILD_DEPRECATED
-/**
-@brief 2D circle primitive
-@deprecated Use @ref circle2DSolid() or @ref circle2DWireframe() instead.
-*/
-struct MAGNUM_PRIMITIVES_EXPORT Circle {
-    /** @brief @copybrief circle2DSolid()
-     * @deprecated Use @ref circle2DSolid() instead.
-     */
-    CORRADE_DEPRECATED("use circle2DSolid() instead") static Trade::MeshData2D solid(UnsignedInt segments);
-
-    /** @brief @copybrief circle2DWireframe()
-     * @deprecated Use @ref circle2DWireframe() instead.
-     */
-    CORRADE_DEPRECATED("use circle2DWireframe() instead") static Trade::MeshData2D wireframe(UnsignedInt segments);
-};
-#endif
-
 /**
 @brief Solid 3D circle
-@param segments  Number of segments. Must be greater or equal to @cpp 3 @ce.
+@param segments         Number of segments. Must be greater or equal to
+    @cpp 3 @ce.
+@param textureCoords    Whether to generate texture coordinates
 
 Circle on the XY plane with radius @cpp 1.0f @ce. Non-indexed
 @ref MeshPrimitive::TriangleFan with normals in positive Z direction.
@@ -91,7 +84,7 @@ Circle on the XY plane with radius @cpp 1.0f @ce. Non-indexed
 
 @see @ref circle3DWireframe(), @ref circle2DSolid()
 */
-MAGNUM_PRIMITIVES_EXPORT Trade::MeshData3D circle3DSolid(UnsignedInt segments);
+MAGNUM_PRIMITIVES_EXPORT Trade::MeshData3D circle3DSolid(UnsignedInt segments, CircleTextureCoords textureCoords = CircleTextureCoords::DontGenerate);
 
 /**
 @brief Wireframe 3D circle

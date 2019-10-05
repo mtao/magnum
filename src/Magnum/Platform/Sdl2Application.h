@@ -70,6 +70,8 @@ namespace Implementation {
 /** @nosubgrouping
 @brief SDL2 application
 
+@m_keywords{Application}
+
 Application using [Simple DirectMedia Layer](http://www.libsdl.org/) toolkit.
 Supports keyboard and mouse handling.
 
@@ -109,41 +111,13 @@ See @ref cmake for more information.
 
 @section Platform-Sdl2Application-bootstrap-emscripten Bootstrap application for Emscripten
 
-Fully contained base application using @ref Sdl2Application for both desktop
-and Emscripten build along with full HTML markup and CMake setup is available
-in `base-emscripten` branch of [Magnum Bootstrap](https://github.com/mosra/magnum-bootstrap)
-repository, download it as [tar.gz](https://github.com/mosra/magnum-bootstrap/archive/base-emscripten.tar.gz)
-or [zip](https://github.com/mosra/magnum-bootstrap/archive/base-emscripten.zip)
-file. After extracting the downloaded archive, you can do the desktop build in
-the same way as above. For the Emscripten build you also need to put the
-contents of toolchains repository from https://github.com/mosra/toolchains
-in `toolchains/` subdirectory. There are two toolchain files. The
-`generic/Emscripten.cmake` is for the classical (asm.js) build, the
-`generic/Emscripten-wasm.cmake` is for WebAssembly build. Don't forget to adapt
-`EMSCRIPTEN_PREFIX` variable in `toolchains/generic/Emscripten*.cmake` to path
-where Emscripten is installed; you can also pass it explicitly on command-line
-using `-DEMSCRIPTEN_PREFIX`. Default is `/usr/emscripten`.
-
-Then create build directory and run `cmake` and build/install commands in it.
-Set `CMAKE_PREFIX_PATH` to where you have all the dependencies installed, set
-`CMAKE_INSTALL_PREFIX` to have the files installed in proper location (a
-webserver, e.g.  `/srv/http/emscripten`).
-
-@code{.sh}
-mkdir build-emscripten && cd build-emscripten
-cmake .. \
-    -DCMAKE_TOOLCHAIN_FILE="../toolchains/generic/Emscripten.cmake" \
-    -DCMAKE_PREFIX_PATH=/usr/lib/emscripten/system \
-    -DCMAKE_INSTALL_PREFIX=/srv/http/emscripten
-cmake --build .
-cmake --build . --target install
-@endcode
-
-You can then open `MyApplication.html` in your browser (through a webserver,
-e.g. http://localhost/emscripten/MyApplication.html).
-
-Detailed information about deployment for Emscripten and all needed boilerplate
-together with a troubleshooting guide is available in @ref platforms-html5.
+The dedicated application implementation for Emscripten is
+@ref EmscriptenApplication, which also provides a bootstrap project along with
+full HTML markup and CMake setup. @ref Sdl2Application however supports
+Emscripten as well --- set up the bootstrap application as
+@ref Platform-EmscriptenApplication-bootstrap "described in the EmscriptenApplication docs"
+and then change `src/CMakeLists.txt` and the @cpp #include @ce to use
+@ref Sdl2Application for both the native and the web build.
 
 @section Platform-Sdl2Application-bootstrap-ios Bootstrap application for iOS
 
@@ -209,14 +183,17 @@ final package along with a PowerShell script for easy local installation.
 
 @section Platform-Sdl2Application-usage General usage
 
-In order to use this library from CMake, you need to copy `FindSDL2.cmake` from
-the `modules/` directory in Magnum source to the `modules/` dir in your project
-(so it is able to find the SDL2 library). In case of Emscripten you need also
-`FindOpenGLES2.cmake` / `FindOpenGLES3.cmake`. Request the `Sdl2Application`
-component of the `Magnum` package and link to the `Magnum::Sdl2Application`
-target:
+In order to use this library from CMake, you need to copy
+[FindSDL2.cmake](https://github.com/mosra/magnum/blob/master/modules/FindSDL2.cmake)
+from the `modules/` directory in Magnum sources to a `modules/` dir in your
+project and pointing `CMAKE_MODULE_PATH` to it (if not done already) so it is
+able to find the SDL2 library. Then request the `Sdl2Application` component of
+the `Magnum` package and link to the `Magnum::Sdl2Application` target:
 
 @code{.cmake}
+# Path where FindSDL2.cmake can be found, adapt as needed
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
+
 find_package(Magnum REQUIRED Sdl2Application)
 
 # ...
@@ -306,6 +283,11 @@ If you enable @ref Configuration::WindowFlag::Resizable, the canvas will be
 resized when size of the canvas changes and you get @ref viewportEvent(). If
 the flag is not enabled, no canvas resizing is performed.
 
+@note While this implementation supports Esmcripten and is going to continue
+    supporting it for the foreseeable future, @ref EmscriptenApplication is now
+    the preferred application implementation for the web. It offers a broader
+    range of features, more efficient idle behavior and smaller code size.
+
 @subsection Platform-Sdl2Application-usage-gles OpenGL ES specifics
 
 For OpenGL ES, SDL2 defaults to a "desktop GLES" context of the system driver.
@@ -393,7 +375,12 @@ The default is depending on the platform:
     scaling, taken from [Window.getDevicePixelRatio()](https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio). The
     @ref windowSize() and @ref framebufferSize() is always the same,
     @ref dpiScaling() contains the queried DPI scaling value. The value can be
-    overriden using custom DPI scaling.
+    overriden using custom DPI scaling. Note that this is different from the
+    behavior in @ref EmscriptenApplication --- Emscripten's SDL implementation
+    has some additional emulation code that reports event coordinates in
+    framebuffer pixels instead of CSS pixels. See
+    @ref Platform-EmscriptenApplication-dpi "EmscriptenApplication DPI awareness docs"
+    for more information.
 
 If your application is saving and restoring window size, it's advisable to take
 @ref dpiScaling() into account:
@@ -689,7 +676,7 @@ class Sdl2Application {
          * zero vector, use @ref dpiScaling(const Configuration&) const for
          * calculating a value independently. See @ref Platform-Sdl2Application-dpi
          * for more information.
-         * @see @ref Sdl2Application::dpiScaling(), @ref framebufferSize()
+         * @see @ref framebufferSize()
          */
         Vector2 dpiScaling() const { return _dpiScaling; }
 
@@ -702,6 +689,13 @@ class Sdl2Application {
          * @ref Platform-Sdl2Application-dpi for more information.
          */
         Vector2 dpiScaling(const Configuration& configuration) const;
+
+        /**
+         * @brief Set window title
+         *
+         * The @p title is expected to be encoded in UTF-8.
+         */
+        void setWindowTitle(const std::string& title);
 
         #if defined(CORRADE_TARGET_EMSCRIPTEN) || defined(DOXYGEN_GENERATING_OUTPUT)
         /**
@@ -972,6 +966,7 @@ class Sdl2Application {
          */
         virtual void exitEvent(ExitEvent& event);
 
+    protected:
         /**
          * @brief Tick event
          *
@@ -980,9 +975,15 @@ class Sdl2Application {
          * might be no input events and redraw is not requested. Useful e.g.
          * for asynchronous task polling. Use @ref setMinimalLoopPeriod()/
          * @ref setSwapInterval() to control main loop frequency.
+         *
+         * If this implementation gets called from its @cpp override @ce, it
+         * will effectively stop the tick event from being fired and the app
+         * returns back to waiting for input events. This can be used to
+         * disable the tick event when not needed.
          */
         virtual void tickEvent();
 
+    private:
         /**
          * @brief Any event
          *
@@ -1025,14 +1026,13 @@ class Sdl2Application {
         SDL_Window* _window{};
         UnsignedInt _minimalLoopPeriod;
         #else
+        SDL_Surface* _surface{};
         Vector2i _lastKnownCanvasSize;
         #endif
 
         #ifdef MAGNUM_TARGET_GL
         #ifndef CORRADE_TARGET_EMSCRIPTEN
-        SDL_GLContext _glContext;
-        #else
-        SDL_Surface* _glContext{};
+        SDL_GLContext _glContext{};
         #endif
         Containers::Pointer<Platform::GLContext> _context;
         #endif
@@ -1046,7 +1046,7 @@ class Sdl2Application {
 /**
 @brief OpenGL context configuration
 
-The created window is always with double-buffered OpenGL context.
+The created window is always with a double-buffered OpenGL context.
 
 @note This function is available only if Magnum is compiled with
     @ref MAGNUM_TARGET_GL enabled (done by default). See @ref building-features
@@ -1060,7 +1060,7 @@ class Sdl2Application::GLConfiguration {
         /**
          * @brief Context flag
          *
-         * @see @ref Flags, @ref setFlags(), @ref Context::Flag
+         * @see @ref Flags, @ref setFlags(), @ref GL::Context::Flag
          * @requires_gles Context flags are not available in WebGL.
          */
         enum class Flag: int {
@@ -1074,20 +1074,24 @@ class Sdl2Application::GLConfiguration {
             ForwardCompatible = SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG,
             #endif
 
-            /** Create debug context */
+            /**
+             * Debug context. Enabled automatically if the
+             * `--magnum-gpu-validation` @ref GL-Context-command-line "command-line option"
+             * is present.
+             */
             Debug = SDL_GL_CONTEXT_DEBUG_FLAG,
 
-            /** Create context with robust access */
+            /** Context with robust access */
             RobustAccess = SDL_GL_CONTEXT_ROBUST_ACCESS_FLAG,
 
-            /** Create context with reset isolation */
+            /** Context with reset isolation */
             ResetIsolation = SDL_GL_CONTEXT_RESET_ISOLATION_FLAG
         };
 
         /**
          * @brief Context flags
          *
-         * @see @ref setFlags(), @ref Context::Flags
+         * @see @ref setFlags(), @ref GL::Context::Flags
          * @requires_gles Context flags are not available in WebGL.
          */
         #ifndef DOXYGEN_GENERATING_OUTPUT
@@ -1505,10 +1509,14 @@ class Sdl2Application::Configuration {
          * @return Reference to self (for method chaining)
          *
          * Default is @cpp "Magnum SDL2 Application" @ce.
-         * @note In @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" and
-         *      @ref CORRADE_TARGET_IOS "iOS" this function does nothing and is
-         *      included only for compatibility. You need to set the title
-         *      separately in platform-specific configuration file.
+         * @note On @ref CORRADE_TARGET_IOS "iOS" this function does nothing
+         *      and is included only for compatibility. You need to set the
+         *      title separately in platform-specific configuration file.
+         * @note Similarly, on @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" this
+         *      function is only for compatibility, as the page title is
+         *      expected to be set by the HTML markup. However, it's possible
+         *      to change the page title later (for example in response to
+         *      application state change) using @ref setWindowTitle().
          */
         #if !defined(CORRADE_TARGET_EMSCRIPTEN) && !defined(CORRADE_TARGET_IOS)
         Configuration& setTitle(std::string title) {
@@ -1866,8 +1874,6 @@ class Sdl2Application::InputEvent {
 @see @ref keyPressEvent(), @ref keyReleaseEvent()
 */
 class Sdl2Application::KeyEvent: public Sdl2Application::InputEvent {
-    friend Sdl2Application;
-
     public:
         /**
          * @brief Key
@@ -2076,6 +2082,8 @@ class Sdl2Application::KeyEvent: public Sdl2Application::InputEvent {
         bool isRepeated() const { return _repeated; }
 
     private:
+        friend Sdl2Application;
+
         explicit KeyEvent(const SDL_Event& event, Key key, Modifiers modifiers, bool repeated): InputEvent{event}, _key{key}, _modifiers{modifiers}, _repeated{repeated} {}
 
         const Key _key;
@@ -2090,8 +2098,6 @@ class Sdl2Application::KeyEvent: public Sdl2Application::InputEvent {
     @ref mouseReleaseEvent()
 */
 class Sdl2Application::MouseEvent: public Sdl2Application::InputEvent {
-    friend Sdl2Application;
-
     public:
         /**
          * @brief Mouse button
@@ -2133,6 +2139,8 @@ class Sdl2Application::MouseEvent: public Sdl2Application::InputEvent {
         Modifiers modifiers();
 
     private:
+        friend Sdl2Application;
+
         explicit MouseEvent(const SDL_Event& event, Button button, const Vector2i& position
             #ifndef CORRADE_TARGET_EMSCRIPTEN
             , Int clickCount
@@ -2158,8 +2166,6 @@ class Sdl2Application::MouseEvent: public Sdl2Application::InputEvent {
 @see @ref MouseEvent, @ref MouseScrollEvent, @ref mouseMoveEvent()
 */
 class Sdl2Application::MouseMoveEvent: public Sdl2Application::InputEvent {
-    friend Sdl2Application;
-
     public:
         /**
          * @brief Mouse button
@@ -2191,7 +2197,7 @@ class Sdl2Application::MouseMoveEvent: public Sdl2Application::InputEvent {
         /**
          * @brief Relative position
          *
-         * Position relative to previous event.
+         * Position relative to previous move event.
          */
         Vector2i relativePosition() const { return _relativePosition; }
 
@@ -2206,6 +2212,8 @@ class Sdl2Application::MouseMoveEvent: public Sdl2Application::InputEvent {
         Modifiers modifiers();
 
     private:
+        friend Sdl2Application;
+
         explicit MouseMoveEvent(const SDL_Event& event, const Vector2i& position, const Vector2i& relativePosition, Buttons buttons): InputEvent{event}, _position{position}, _relativePosition{relativePosition}, _buttons{buttons}, _modifiersLoaded{false} {}
 
         const Vector2i _position, _relativePosition;
@@ -2220,8 +2228,6 @@ class Sdl2Application::MouseMoveEvent: public Sdl2Application::InputEvent {
 @see @ref MouseEvent, @ref MouseMoveEvent, @ref mouseScrollEvent()
 */
 class Sdl2Application::MouseScrollEvent: public Sdl2Application::InputEvent {
-    friend Sdl2Application;
-
     public:
         /** @brief Scroll offset */
         Vector2 offset() const { return _offset; }
@@ -2241,6 +2247,8 @@ class Sdl2Application::MouseScrollEvent: public Sdl2Application::InputEvent {
         Modifiers modifiers();
 
     private:
+        friend Sdl2Application;
+
         explicit MouseScrollEvent(const SDL_Event& event, const Vector2& offset): InputEvent{event}, _offset{offset}, _positionLoaded{false}, _modifiersLoaded{false} {}
 
         const Vector2 _offset;
@@ -2257,8 +2265,6 @@ class Sdl2Application::MouseScrollEvent: public Sdl2Application::InputEvent {
 @see @ref multiGestureEvent()
 */
 class Sdl2Application::MultiGestureEvent {
-    friend Sdl2Application;
-
     public:
         /** @brief Copying is not allowed */
         MultiGestureEvent(const MultiGestureEvent&) = delete;
@@ -2318,6 +2324,8 @@ class Sdl2Application::MultiGestureEvent {
         const SDL_Event& event() const { return _event; }
 
     private:
+        friend Sdl2Application;
+
         explicit MultiGestureEvent(const SDL_Event& event, const Vector2& center, Float relativeRotation, Float relativeDistance, Int fingerCount): _event(event), _center{center}, _relativeRotation{relativeRotation}, _relativeDistance{relativeDistance}, _fingerCount{fingerCount}, _accepted{false} {}
 
         const SDL_Event& _event;
@@ -2334,8 +2342,6 @@ class Sdl2Application::MultiGestureEvent {
 @see @ref TextEditingEvent, @ref textInputEvent()
 */
 class Sdl2Application::TextInputEvent {
-    friend Sdl2Application;
-
     public:
         /** @brief Copying is not allowed */
         TextInputEvent(const TextInputEvent&) = delete;
@@ -2374,6 +2380,8 @@ class Sdl2Application::TextInputEvent {
         const SDL_Event& event() const { return _event; }
 
     private:
+        friend Sdl2Application;
+
         explicit TextInputEvent(const SDL_Event& event, Containers::ArrayView<const char> text): _event(event), _text{text}, _accepted{false} {}
 
         const SDL_Event& _event;
@@ -2387,8 +2395,6 @@ class Sdl2Application::TextInputEvent {
 @see @ref textEditingEvent()
 */
 class Sdl2Application::TextEditingEvent {
-    friend Sdl2Application;
-
     public:
         /** @brief Copying is not allowed */
         TextEditingEvent(const TextEditingEvent&) = delete;
@@ -2433,6 +2439,8 @@ class Sdl2Application::TextEditingEvent {
         const SDL_Event& event() const { return _event; }
 
     private:
+        friend Sdl2Application;
+
         explicit TextEditingEvent(const SDL_Event& event, Containers::ArrayView<const char> text, Int start, Int length): _event(event), _text{text}, _start{start}, _length{length}, _accepted{false} {}
 
         const SDL_Event& _event;
@@ -2495,7 +2503,6 @@ typedef BasicScreenedApplication<Sdl2Application> ScreenedApplication;
 #endif
 #endif
 
-CORRADE_ENUMSET_OPERATORS(Sdl2Application::Flags)
 CORRADE_ENUMSET_OPERATORS(Sdl2Application::Configuration::WindowFlags)
 CORRADE_ENUMSET_OPERATORS(Sdl2Application::InputEvent::Modifiers)
 CORRADE_ENUMSET_OPERATORS(Sdl2Application::MouseMoveEvent::Buttons)

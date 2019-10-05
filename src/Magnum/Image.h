@@ -31,7 +31,8 @@
 
 #include <Corrade/Containers/Array.h>
 
-#include "Magnum/ImageView.h"
+#include "Magnum/DimensionTraits.h"
+#include "Magnum/PixelStorage.h"
 
 namespace Magnum {
 
@@ -290,7 +291,12 @@ template<UnsignedInt dimensions> class Image {
          * Equivalent to calling @ref Image(PixelStorage, T) with
          * default-constructed @ref PixelStorage.
          */
-        template<class T> /*implicit*/ Image(T format) noexcept: Image{{}, format} {}
+        template<class T
+            #ifndef DOXYGEN_GENERATING_OUTPUT
+            /* Otherwise this catches too much, resulting in weird errors */
+            , class = typename std::enable_if<std::is_enum<T>::value || std::is_integral<T>::value>::type
+            #endif
+            > /*implicit*/ Image(T format) noexcept: Image{{}, format} {}
 
         /** @brief Copying is not allowed */
         Image(const Image<dimensions>&) = delete;
@@ -307,7 +313,9 @@ template<UnsignedInt dimensions> class Image {
         /** @brief Conversion to view */
         /* Not restricted to const&, because we might want to pass the view to
            another function in an oneliner (e.g. saving screenshot) */
-        /*implicit*/ operator ImageView<dimensions>() const;
+        /*implicit*/ operator BasicMutableImageView<dimensions>();
+        /** @overload */
+        /*implicit*/ operator BasicImageView<dimensions>() const;
 
         /** @brief Storage of pixel data */
         PixelStorage storage() const { return _storage; }
@@ -348,31 +356,54 @@ template<UnsignedInt dimensions> class Image {
          *
          * See @ref PixelStorage::dataProperties() for more information.
          */
-        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const {
-            return Implementation::imageDataProperties<dimensions>(*this);
-        }
+        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const;
 
         /**
-         * @brief Raw data
+         * @brief Image data
          *
          * @see @ref release(), @ref pixels()
          */
         Containers::ArrayView<char> data() & { return _data; }
-        Containers::ArrayView<char> data() && = delete; /**< @overload */
 
         /** @overload */
         Containers::ArrayView<const char> data() const & { return _data; }
-        Containers::ArrayView<const char> data() const && = delete; /**< @overload */
 
-        /** @overload */
-        template<class T = char> T* data() {
+        /**
+         * @brief Image data from a r-value
+         *
+         * Unlike @ref data(), which returns a view, this is equivalent to
+         * @ref release() to avoid a dangling view when the temporary instance
+         * goes out of scope.
+         * @todoc stupid doxygen can't link to & overloads ffs
+         */
+        Containers::Array<char> data() && { return release(); }
+
+        /** @overload
+         * @todo what to do here?!
+         */
+        Containers::Array<char> data() const && = delete;
+
+        #ifdef MAGNUM_BUILD_DEPRECATED
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class T> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") T* data() {
             return reinterpret_cast<T*>(_data.data());
         }
 
-        /** @overload */
-        template<class T = char> const T* data() const {
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class T> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") const T* data() const {
             return reinterpret_cast<const T*>(_data.data());
         }
+        #endif
 
         /**
          * @brief View on pixel data
@@ -541,7 +572,11 @@ template<UnsignedInt dimensions> class CompressedImage {
         CompressedImage<dimensions>& operator=(CompressedImage<dimensions>&& other) noexcept;
 
         /** @brief Conversion to view */
-        /*implicit*/ operator CompressedImageView<dimensions>() const;
+        /* Not restricted to const&, because we might want to pass the view to
+           another function in an oneliner (e.g. saving screenshot) */
+        /*implicit*/ operator BasicMutableCompressedImageView<dimensions>();
+        /** @overload */
+        /*implicit*/ operator BasicCompressedImageView<dimensions>() const;
 
         /** @brief Storage of compressed pixel data */
         CompressedPixelStorage storage() const { return _storage; }
@@ -566,29 +601,54 @@ template<UnsignedInt dimensions> class CompressedImage {
          * See @ref CompressedPixelStorage::dataProperties() for more
          * information.
          */
-        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const {
-            return Implementation::compressedImageDataProperties<dimensions>(*this);
-        }
+        std::pair<VectorTypeFor<dimensions, std::size_t>, VectorTypeFor<dimensions, std::size_t>> dataProperties() const;
 
         /**
          * @brief Raw data
          *
          * @see @ref release()
          */
-        Containers::ArrayView<char> data() { return _data; }
+        Containers::ArrayView<char> data() & { return _data; }
 
         /** @overload */
-        Containers::ArrayView<const char> data() const { return _data; }
+        Containers::ArrayView<const char> data() const & { return _data; }
 
-        /** @overload */
-        template<class T> T* data() {
+        /**
+         * @brief Raw data from a r-value
+         *
+         * Unlike @ref data(), which returns a view, this is equivalent to
+         * @ref release() to avoid a dangling view when the temporary instance
+         * goes out of scope.
+         * @todoc stupid doxygen can't link to & overloads ffs
+         */
+        Containers::Array<char> data() && { return release(); }
+
+        /** @overload
+         * @todo what to do here?!
+         */
+        Containers::Array<char> data() const && = delete;
+
+        #ifdef MAGNUM_BUILD_DEPRECATED
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class T> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") T* data() {
             return reinterpret_cast<T*>(_data.data());
         }
 
-        /** @overload */
-        template<class T> const T* data() const {
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class T> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") const T* data() const {
             return reinterpret_cast<const T*>(_data.data());
         }
+        #endif
 
         /**
          * @brief Release data storage
@@ -618,57 +678,6 @@ typedef CompressedImage<2> CompressedImage2D;
 
 /** @brief Three-dimensional compressed image */
 typedef CompressedImage<3> CompressedImage3D;
-
-template<UnsignedInt dimensions> inline Image<dimensions>::Image(Image<dimensions>&& other) noexcept: _storage{std::move(other._storage)}, _format{std::move(other._format)}, _formatExtra{std::move(other._formatExtra)}, _pixelSize{std::move(other._pixelSize)}, _size{std::move(other._size)}, _data{std::move(other._data)} {
-    other._size = {};
-}
-
-template<UnsignedInt dimensions> inline CompressedImage<dimensions>::CompressedImage(CompressedImage<dimensions>&& other) noexcept: _storage{std::move(other._storage)}, _format{std::move(other._format)}, _size{std::move(other._size)}, _data{std::move(other._data)}
-{
-    other._size = {};
-}
-
-template<UnsignedInt dimensions> inline Image<dimensions>& Image<dimensions>::operator=(Image<dimensions>&& other) noexcept {
-    using std::swap;
-    swap(_storage, other._storage);
-    swap(_format, other._format);
-    swap(_formatExtra, other._formatExtra);
-    swap(_pixelSize, other._pixelSize);
-    swap(_size, other._size);
-    swap(_data, other._data);
-    return *this;
-}
-
-template<UnsignedInt dimensions> inline CompressedImage<dimensions>& CompressedImage<dimensions>::operator=(CompressedImage<dimensions>&& other) noexcept {
-    using std::swap;
-    swap(_storage, other._storage);
-    swap(_format, other._format);
-    swap(_size, other._size);
-    swap(_data, other._data);
-    return *this;
-}
-
-template<UnsignedInt dimensions> inline Image<dimensions>::operator ImageView<dimensions>() const
-{
-    return ImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size, _data};
-}
-
-template<UnsignedInt dimensions> inline CompressedImage<dimensions>::operator CompressedImageView<dimensions>() const
-{
-    return CompressedImageView<dimensions>{_storage, _format, _size, _data};
-}
-
-template<UnsignedInt dimensions> inline Containers::Array<char> Image<dimensions>::release() {
-    Containers::Array<char> data{std::move(_data)};
-    _size = {};
-    return data;
-}
-
-template<UnsignedInt dimensions> inline Containers::Array<char> CompressedImage<dimensions>::release() {
-    Containers::Array<char> data{std::move(_data)};
-    _size = {};
-    return data;
-}
 
 template<UnsignedInt dimensions> template<class T, class U> inline Image<dimensions>::Image(const PixelStorage storage, const T format, const U formatExtra, const VectorTypeFor<dimensions, Int>& size, Containers::Array<char>&& data) noexcept: Image{storage, UnsignedInt(format), UnsignedInt(formatExtra), Implementation::pixelSizeAdl(format, formatExtra), size, std::move(data)} {
     static_assert(sizeof(T) <= 4 && sizeof(U) <= 4,

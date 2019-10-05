@@ -33,6 +33,7 @@
 #include <Corrade/Utility/Directory.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
 #include "Magnum/Trade/AbstractImageConverter.h"
 #include "Magnum/Trade/ImageData.h"
@@ -187,7 +188,7 @@ void AbstractImageConverterTest::exportToImageNotImplemented() {
     Error redirectError{&out};
 
     Converter converter;
-    converter.exportToImage(ImageView2D{PixelFormat::R8Unorm, {4, 6}, Containers::ArrayView<char>{nullptr, 24}});
+    converter.exportToImage(ImageView2D{PixelFormat::R8Unorm, {4, 6}, Containers::ArrayView<char>{nullptr, 128}});
     CORRADE_COMPARE(out.str(), "Trade::AbstractImageConverter::exportToImage(): feature advertised but not implemented\n");
 }
 
@@ -200,7 +201,7 @@ void AbstractImageConverterTest::exportToCompressedImage() {
     };
 
     Converter converter;
-    Containers::Optional<CompressedImage2D> actual = converter.exportToCompressedImage(ImageView2D{PixelFormat::R8Unorm, {16, 8}, Containers::ArrayView<char>{nullptr, 24}});
+    Containers::Optional<CompressedImage2D> actual = converter.exportToCompressedImage(ImageView2D{PixelFormat::R8Unorm, {16, 8}, Containers::ArrayView<char>{nullptr, 128}});
     CORRADE_VERIFY(actual);
     CORRADE_COMPARE(actual->data().size(), 64);
     CORRADE_COMPARE(actual->size(), (Vector2i{16, 8}));
@@ -215,7 +216,7 @@ void AbstractImageConverterTest::exportToCompressedImageNotSupported() {
     Error redirectError{&out};
 
     Converter converter;
-    converter.exportToCompressedImage(ImageView2D{PixelFormat::R8Unorm, {16, 8}, Containers::ArrayView<char>{nullptr, 24}});
+    converter.exportToCompressedImage(ImageView2D{PixelFormat::R8Unorm, {16, 8}, Containers::ArrayView<char>{nullptr, 128}});
     CORRADE_COMPARE(out.str(), "Trade::AbstractImageConverter::exportToCompressedImage(): feature not supported\n");
 }
 
@@ -228,7 +229,7 @@ void AbstractImageConverterTest::exportToCompressedImageNotImplemented() {
     Error redirectError{&out};
 
     Converter converter;
-    converter.exportToCompressedImage(ImageView2D{PixelFormat::R8Unorm, {16, 8}, Containers::ArrayView<char>{nullptr, 24}});
+    converter.exportToCompressedImage(ImageView2D{PixelFormat::R8Unorm, {16, 8}, Containers::ArrayView<char>{nullptr, 128}});
     CORRADE_COMPARE(out.str(), "Trade::AbstractImageConverter::exportToCompressedImage(): feature advertised but not implemented\n");
 }
 

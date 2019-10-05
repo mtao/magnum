@@ -26,6 +26,7 @@
 #include <Corrade/Utility/Arguments.h>
 #include <Corrade/Utility/Debug.h>
 #include <Corrade/Utility/DebugStl.h>
+#include <Corrade/Utility/String.h>
 
 #include "Magnum/GL/AbstractShaderProgram.h"
 #include "Magnum/GL/Buffer.h"
@@ -241,6 +242,9 @@ MagnumInfo::MagnumInfo(const Arguments& arguments): Platform::WindowlessApplicat
     #ifdef CORRADE_BUILD_STATIC
     Debug() << "    CORRADE_BUILD_STATIC";
     #endif
+    #ifdef CORRADE_BUILD_MULTITHREADED
+    Debug() << "    CORRADE_BUILD_MULTITHREADED";
+    #endif
     #ifdef CORRADE_TARGET_UNIX
     Debug() << "    CORRADE_TARGET_UNIX";
     #endif
@@ -274,6 +278,15 @@ MagnumInfo::MagnumInfo(const Arguments& arguments): Platform::WindowlessApplicat
     #ifdef CORRADE_TARGET_POWERPC
     Debug() << "    CORRADE_TARGET_POWERPC";
     #endif
+    #ifdef CORRADE_TARGET_LIBCXX
+    Debug() << "    CORRADE_TARGET_LIBCXX";
+    #endif
+    #ifdef CORRADE_TARGET_DINKUMWARE
+    Debug() << "    CORRADE_TARGET_DINKUMWARE";
+    #endif
+    #ifdef CORRADE_TARGET_LIBSTDCXX
+    Debug() << "    CORRADE_TARGET_LIBSTDCXX";
+    #endif
     #ifdef CORRADE_PLUGINMANAGER_NO_DYNAMIC_PLUGIN_SUPPORT
     Debug() << "    CORRADE_PLUGINMANAGER_NO_DYNAMIC_PLUGIN_SUPPORT";
     #endif
@@ -288,9 +301,6 @@ MagnumInfo::MagnumInfo(const Arguments& arguments): Platform::WindowlessApplicat
     #endif
     #ifdef MAGNUM_BUILD_STATIC
     Debug() << "    MAGNUM_BUILD_STATIC";
-    #endif
-    #ifdef MAGNUM_BUILD_MULTITHREADED
-    Debug() << "    MAGNUM_BUILD_MULTITHREADED";
     #endif
     #ifdef MAGNUM_TARGET_GLES
     Debug() << "    MAGNUM_TARGET_GLES";
@@ -314,6 +324,8 @@ MagnumInfo::MagnumInfo(const Arguments& arguments): Platform::WindowlessApplicat
     createContext();
     GL::Context& c = GL::Context::current();
 
+    Debug() << "";
+
     #ifndef MAGNUM_TARGET_GLES
     Debug() << "Core profile:" << (c.isCoreProfile() ? "yes" : "no");
     #endif
@@ -323,9 +335,7 @@ MagnumInfo::MagnumInfo(const Arguments& arguments): Platform::WindowlessApplicat
     Debug() << "Detected driver:" << c.detectedDriver();
 
     Debug() << "Supported GLSL versions:";
-    const std::vector<std::string> shadingLanguageVersions = c.shadingLanguageVersionStrings();
-    for(const auto& version: shadingLanguageVersions)
-        Debug() << "   " << version;
+    Debug() << "   " << Utility::String::joinWithoutEmptyParts(c.shadingLanguageVersionStrings(), ", ");
 
     if(args.isSet("extension-strings")) {
         Debug() << "Extension strings:" << Debug::newline

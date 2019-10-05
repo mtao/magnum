@@ -36,36 +36,96 @@
 namespace Magnum { namespace Platform {
 
 namespace Implementation {
-    enum class PropagatedScreenEvent: UnsignedByte {
-        Draw = 1 << 0,
-        Input = 1 << 1
-    };
 
-    typedef Containers::EnumSet<PropagatedScreenEvent> PropagatedScreenEvents;
-    CORRADE_ENUMSET_OPERATORS(PropagatedScreenEvents)
+enum class PropagatedScreenEvent: UnsignedByte {
+    Draw = 1 << 0,
+    Input = 1 << 1
+};
+
+typedef Containers::EnumSet<PropagatedScreenEvent> PropagatedScreenEvents;
+CORRADE_ENUMSET_OPERATORS(PropagatedScreenEvents)
+
+/* These provide overrideable event handlers on the Screen side for events that
+   are not implemented by all apps. The virtual *Event() function is defined
+   only if the base Application has it. Calling into those is done through
+   a corresponding Application*EventMixin defined in ScreenedApplication.h. */
+template<class Application, bool> class ScreenKeyEventMixin {};
+template<class Application> class ScreenKeyEventMixin<Application, true> {
+    public:
+        typedef typename BasicScreenedApplication<Application>::KeyEvent KeyEvent;
+
+    private:
+        friend ApplicationKeyEventMixin<Application, true>;
+
+        virtual void keyPressEvent(KeyEvent& event);
+        virtual void keyReleaseEvent(KeyEvent& event);
+};
+
+template<class Application, bool> class ScreenMouseScrollEventMixin {};
+template<class Application> class ScreenMouseScrollEventMixin<Application, true> {
+    public:
+        typedef typename BasicScreenedApplication<Application>::MouseScrollEvent MouseScrollEvent;
+
+    private:
+        friend ApplicationMouseScrollEventMixin<Application, true>;
+
+        virtual void mouseScrollEvent(MouseScrollEvent& event);
+};
+
+template<class Application, bool> class ScreenTextInputEventMixin {};
+template<class Application> class ScreenTextInputEventMixin<Application, true> {
+    public:
+        typedef typename BasicScreenedApplication<Application>::TextInputEvent TextInputEvent;
+
+    private:
+        friend ApplicationTextInputEventMixin<Application, true>;
+
+        virtual void textInputEvent(TextInputEvent& event);
+};
+
+template<class Application, bool> class ScreenTextEditingEventMixin {};
+template<class Application> class ScreenTextEditingEventMixin<Application, true> {
+    public:
+        typedef typename BasicScreenedApplication<Application>::TextEditingEvent TextEditingEvent;
+
+    private:
+        friend ApplicationTextEditingEventMixin<Application, true>;
+
+        virtual void textEditingEvent(TextEditingEvent& event);
+};
+
 }
 
 /**
 @brief Base for application screens
 
-See @ref BasicScreenedApplication for more information.
+@m_keywords{Screen}
 
-If exactly one application header is included, this class is also aliased to
+See @ref BasicScreenedApplication for more information. If exactly one
+application header is included, this class is also aliased to
 @cpp Platform::Screen @ce.
 
 @section Platform-BasicScreen-template-specializations Explicit template specializations
 
 The following specialization are explicitly compiled into each particular
-`*Application` library. For other specializations you have to use
+`*Application` library. For other specializations you have to use the
 @ref ScreenedApplication.hpp implementation file to avoid linker errors. See
 @ref compilation-speedup-hpp for more information.
 
+-   @ref AndroidApplication "BasicScreen<AndroidApplication>"
+-   @ref EmscriptenApplication "BasicScreen<EmscriptenApplication>"
 -   @ref GlfwApplication "BasicScreen<GlfwApplication>"
 -   @ref GlxApplication "BasicScreen<GlxApplication>"
 -   @ref Sdl2Application "BasicScreen<Sdl2Application>"
 -   @ref XEglApplication "BasicScreen<XEglApplication>"
 */
-template<class Application> class BasicScreen: private Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>> {
+template<class Application> class BasicScreen:
+    private Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>,
+    public Implementation::ScreenKeyEventMixin<Application, Implementation::HasKeyEvent<Application>::value>,
+    public Implementation::ScreenMouseScrollEventMixin<Application, Implementation::HasMouseScrollEvent<Application>::value>,
+    public Implementation::ScreenTextInputEventMixin<Application, Implementation::HasTextInputEvent<Application>::value>,
+    public Implementation::ScreenTextEditingEventMixin<Application, Implementation::HasTextEditingEvent<Application>::value>
+{
     public:
         #ifdef DOXYGEN_GENERATING_OUTPUT
         /**
@@ -85,8 +145,10 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
              * Input events.
              *
              * When enabled, @ref keyPressEvent(), @ref keyReleaseEvent(),
-             * @ref mousePressEvent(), @ref mouseReleaseEvent() and
-             * @ref mouseMoveEvent() are propagated to this screen.
+             * @ref mousePressEvent(), @ref mouseReleaseEvent(),
+             * @ref mouseMoveEvent(), @ref mouseScrollEvent(),
+             * @ref textInputEvent() and @ref textEditingEvent() are propagated
+             * to this screen.
              */
             Input = 1 << 1
         };
@@ -108,8 +170,15 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
         /** @brief Input event */
         typedef typename BasicScreenedApplication<Application>::InputEvent InputEvent;
 
-        /** @brief Key event */
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        /**
+         * @brief Key event
+         *
+         * Defined only if the application has a
+         * @ref Sdl2Application::KeyEvent "KeyEvent".
+         */
         typedef typename BasicScreenedApplication<Application>::KeyEvent KeyEvent;
+        #endif
 
         /** @brief Mouse event */
         typedef typename BasicScreenedApplication<Application>::MouseEvent MouseEvent;
@@ -117,8 +186,58 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
         /** @brief Mouse move event */
         typedef typename BasicScreenedApplication<Application>::MouseMoveEvent MouseMoveEvent;
 
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        /**
+         * @brief Mouse scroll event
+         *
+         * Defined only if the application has a
+         * @ref Sdl2Application::MouseScrollEvent "MouseScrollEvent".
+         */
+        typedef typename BasicScreenedApplication<Application>::MouseScrollEvent MouseScrollEvent;
+
+        /**
+         * @brief Text input event
+         *
+         * Defined only if the application has a
+         * @ref Sdl2Application::TextInputEvent "TextInputEvent".
+         */
+        typedef typename BasicScreenedApplication<Application>::TextInputEvent TextInputEvent;
+
+        /**
+         * @brief Text editing event
+         *
+         * Defined only if the application has a
+         * @ref Sdl2Application::TextEditingEvent "TextEditingEvent".
+         */
+        typedef typename BasicScreenedApplication<Application>::TextEditingEvent TextEditingEvent;
+        #endif
+
+        /**
+         * @brief Construct a detached screen
+         *
+         * The screen is not attached to any application, use
+         * @ref BasicScreenedApplication::addScreen() to add it. Alternatively,
+         * use @ref BasicScreen(BasicScreenedApplication<Application>&, PropagatedEvents) to
+         * attach the screen right during the construction.
+         */
         explicit BasicScreen();
-        ~BasicScreen();
+
+        /**
+         * @brief Construct a screen and attach it to an application
+         *
+         * Unlike with @ref BasicScreen(), the screen is added to the
+         * application already during the construction, removing the need to
+         * call @ref BasicScreenedApplication::addScreen() later. This also
+         * means @ref focusEvent() is not called for the very first time,
+         * assuming the screen is put into desired state already during
+         * construction.
+         * @see @ref setPropagatedEvents()
+         */
+        explicit BasicScreen(BasicScreenedApplication<Application>& application, PropagatedEvents events);
+
+        /* A common use case is a list of screen derivatives, so allow deleting
+           them through a base pointer */
+        virtual ~BasicScreen();
 
         /** @brief Events propagated to this screen */
         PropagatedEvents propagatedEvents() const { return _propagatedEvents; }
@@ -129,16 +248,37 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
          * For non-propagated events related event functions are not called.
          * No events are propagated by default, call this function in
          * @ref focusEvent() and @ref blurEvent() to reflect focus changes.
+         * @see @ref BasicScreen(BasicScreenedApplication<Application>&, PropagatedEvents)
          */
         void setPropagatedEvents(PropagatedEvents events) { _propagatedEvents = events; }
 
-        /** @brief Application holding this screen */
-        template<class T = BasicScreenedApplication<Application>> T* application() {
-            return static_cast<T*>(Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::list());
+        /**
+         * @brief Whether the screen is added to an application
+         *
+         * If not, the @ref application() accessor can't be used.
+         * @see @ref BasicScreenedApplication::addScreen(),
+         *      @ref BasicScreenedApplication::removeScreen()
+         */
+        bool hasApplication() {
+            return Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::list();
+        }
+
+        /**
+         * @brief Application holding this screen
+         *
+         * Expects that the screen is added to an application.
+         * @see @ref hasApplication()
+         */
+        BasicScreenedApplication<Application>& application();
+        /** @overload */
+        const BasicScreenedApplication<Application>& application() const;
+        /** @overload */
+        template<class T = BasicScreenedApplication<Application>> T& application() {
+            return static_cast<T&>(application());
         }
         /** @overload */
-        template<class T = BasicScreenedApplication<Application>> const T* application() const {
-            return static_cast<const T*>(Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::list());
+        template<class T = BasicScreenedApplication<Application>> const T& application() const {
+            return static_cast<const T&>(application());
         }
 
         /**
@@ -171,17 +311,25 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
             return Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>::next();
         }
 
-    protected:
-        /** @brief Request redraw */
-        virtual void redraw() { application()->redraw(); }
+        /** @{ @name Screen handling */
 
+    protected:
+        /**
+         * @brief Request redraw
+         *
+         * Expects that the screen is added to an application.
+         * @see @ref hasApplication()
+         */
+        virtual void redraw();
+
+    private:
         /**
          * @brief Focus event
          *
          * Called when screen is focused using @ref BasicScreenedApplication::focusScreen()
          * or @ref BasicScreenedApplication::addScreen().
          */
-        virtual void focusEvent() = 0;
+        virtual void focusEvent();
 
         /**
          * @brief Blur event
@@ -190,7 +338,7 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
          * @ref BasicScreenedApplication::addScreen() or before the screen is
          * removed from application using @ref BasicScreenedApplication::removeScreen().
          */
-        virtual void blurEvent() = 0;
+        virtual void blurEvent();
 
         /**
          * @brief Viewport event
@@ -224,12 +372,18 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
          */
         virtual void drawEvent() = 0;
 
+        /*@}*/
+
+        /** @{ @name Keyboard handling */
+
+        #ifdef DOXYGEN_GENERATING_OUTPUT
         /**
          * @brief Key press event
          *
          * Called when @ref PropagatedEvent::Input is enabled and an key is
          * pressed. See @ref Sdl2Application::keyPressEvent() "*Application::keyPressEvent()"
-         * for more information.
+         * for more information. Defined only if the application has a
+         * @ref Sdl2Application::KeyEvent "KeyEvent".
          */
         virtual void keyPressEvent(KeyEvent& event);
 
@@ -238,9 +392,15 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
          *
          * Called when @ref PropagatedEvent::Input is enabled and an key is
          * released. See @ref Sdl2Application::keyReleaseEvent() "*Application::keyReleaseEvent()"
-         * for more information.
+         * for more information. Defined only if the application has a
+         * @ref Sdl2Application::KeyEvent "KeyEvent".
          */
         virtual void keyReleaseEvent(KeyEvent& event);
+        #endif
+
+        /*@}*/
+
+        /** @{ @name Mouse handling */
 
         /**
          * @brief Mouse press event
@@ -268,6 +428,44 @@ template<class Application> class BasicScreen: private Containers::LinkedListIte
          * for more information.
          */
         virtual void mouseMoveEvent(MouseMoveEvent& event);
+
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        /**
+         * @brief Mouse scroll event
+         *
+         * Called when @ref PropagatedEvent::Input is enabled and mouse wheel
+         * is rotated. See @ref Sdl2Application::mouseScrollEvent() "*Application::mouseScrollEvent()"
+         * for more information. Defined only if the application has a
+         * @ref Sdl2Application::MouseScrollEvent "MouseScrollEvent".
+         */
+        virtual void mouseScrollEvent(MouseScrollEvent& event);
+        #endif
+
+        /*@}*/
+
+        /** @{ @name Text input handling */
+
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        /**
+         * @brief Text input event
+         *
+         * Called when @ref PropagatedEvent::Input is enabled and text is being
+         * input. Defined only if the application has a
+         * @ref Sdl2Application::TextInputEvent "TextInputEvent".
+         */
+        virtual void textInputEvent(TextInputEvent& event);
+
+        /**
+         * @brief Text editing event
+         *
+         * Called when @ref PropagatedEvent::Input and the text is being
+         * edited. Defined only if the application has a
+         * @ref Sdl2Application::TextEditingEvent "TextEditingEvent".
+         */
+        virtual void textEditingEvent(TextEditingEvent& event);
+        #endif
+
+        /*@}*/
 
     private:
         #ifndef DOXYGEN_GENERATING_OUTPUT /* https://bugzilla.gnome.org/show_bug.cgi?id=776986 */

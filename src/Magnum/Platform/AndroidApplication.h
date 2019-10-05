@@ -54,6 +54,8 @@ namespace Magnum { namespace Platform {
 /** @nosubgrouping
 @brief Android application
 
+@m_keywords{Application}
+
 Application running on Android.
 
 This application library is available only on
@@ -422,8 +424,6 @@ class AndroidApplication {
 
         CORRADE_ENUMSET_FRIEND_OPERATORS(Flags)
 };
-
-CORRADE_ENUMSET_OPERATORS(AndroidApplication::Flags)
 
 /**
 @brief OpenGL context configuration
@@ -800,6 +800,8 @@ header is included this macro is also aliased to @cpp MAGNUM_APPLICATION_MAIN() 
 #ifndef DOXYGEN_GENERATING_OUTPUT
 #ifndef MAGNUM_APPLICATION_MAIN
 typedef AndroidApplication Application;
+typedef BasicScreen<AndroidApplication> Screen;
+typedef BasicScreenedApplication<AndroidApplication> ScreenedApplication;
 #define MAGNUM_APPLICATION_MAIN(className) MAGNUM_ANDROIDAPPLICATION_MAIN(className)
 #else
 #undef MAGNUM_APPLICATION_MAIN

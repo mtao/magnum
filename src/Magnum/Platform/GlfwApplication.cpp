@@ -67,7 +67,11 @@ GlfwApplication::GlfwApplication(const Arguments& arguments, NoCreateT):
     #ifdef MAGNUM_TARGET_GL
     _context.reset(new GLContext{NoCreate, args, arguments.argc, arguments.argv});
     #else
-    args.parse(arguments.argc, arguments.argv);
+    /** @todo this is duplicated here and in Sdl2Application, figure out a nice
+        non-duplicated way to handle this */
+    args.addOption("log", "default").setHelp("log", "console logging", "default|quiet|verbose")
+        .setFromEnvironment("log")
+        .parse(arguments.argc, arguments.argv);
     #endif
 
     /* Init GLFW */
@@ -214,6 +218,10 @@ Vector2 GlfwApplication::dpiScaling(const Configuration& configuration) const {
     #endif
 }
 
+void GlfwApplication::setWindowTitle(const std::string& title) {
+    glfwSetWindowTitle(_window, title.data());
+}
+
 bool GlfwApplication::tryCreate(const Configuration& configuration) {
     #ifdef MAGNUM_TARGET_GL
     #ifdef GLFW_NO_API
@@ -248,7 +256,7 @@ bool GlfwApplication::tryCreate(const Configuration& configuration) {
 
     #ifdef GLFW_NO_API
     /* Disable implicit GL context creation */
-    glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     #endif
 
     /* Create the window */
@@ -330,12 +338,16 @@ bool GlfwApplication::tryCreate(const Configuration& configuration, const GLConf
     glfwWindowHint(GLFW_SAMPLES, glConfiguration.sampleCount());
     glfwWindowHint(GLFW_SRGB_CAPABLE, glConfiguration.isSrgbCapable());
 
-    const GLConfiguration::Flags& flags = glConfiguration.flags();
+    /* Request debug context if --magnum-gpu-validation is enabled */
+    GLConfiguration::Flags glFlags = glConfiguration.flags();
+    if(_context->internalFlags() & GL::Context::InternalFlag::GpuValidation)
+        glFlags |= GLConfiguration::Flag::Debug;
+
     #ifdef GLFW_CONTEXT_NO_ERROR
-    glfwWindowHint(GLFW_CONTEXT_NO_ERROR, flags >= GLConfiguration::Flag::NoError);
+    glfwWindowHint(GLFW_CONTEXT_NO_ERROR, glFlags >= GLConfiguration::Flag::NoError);
     #endif
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, flags >= GLConfiguration::Flag::Debug);
-    glfwWindowHint(GLFW_STEREO, flags >= GLConfiguration::Flag::Stereo);
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, glFlags >= GLConfiguration::Flag::Debug);
+    glfwWindowHint(GLFW_STEREO, glFlags >= GLConfiguration::Flag::Stereo);
 
     /* Set context version, if requested */
     if(glConfiguration.version() != GL::Version::None) {
@@ -346,7 +358,7 @@ bool GlfwApplication::tryCreate(const Configuration& configuration, const GLConf
         #ifndef MAGNUM_TARGET_GLES
         if(glConfiguration.version() >= GL::Version::GL320) {
             glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, flags >= GLConfiguration::Flag::ForwardCompatible);
+            glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, glFlags >= GLConfiguration::Flag::ForwardCompatible);
         }
         #else
         glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
@@ -362,7 +374,7 @@ bool GlfwApplication::tryCreate(const Configuration& configuration, const GLConf
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, flags >= GLConfiguration::Flag::ForwardCompatible);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, glFlags >= GLConfiguration::Flag::ForwardCompatible);
         #else
         /* For ES the major context version is compile-time constant */
         #ifdef MAGNUM_TARGET_GLES3
@@ -401,9 +413,12 @@ bool GlfwApplication::tryCreate(const Configuration& configuration, const GLConf
     #endif
     if(glConfiguration.version() == GL::Version::None && (!_window
         #ifndef CORRADE_TARGET_APPLE
-        /* Sorry about the UGLY code, HOPEFULLY THERE WON'T BE MORE WORKAROUNDS */
+        /* If context creation fails *really bad*, glGetString() may actually
+           return nullptr. Check for that to avoid crashes deep inside
+           strncmp(). Sorry about the UGLY code, HOPEFULLY THERE WON'T BE MORE
+           WORKAROUNDS */
         || (vendorString = reinterpret_cast<const char*>(glGetString(GL_VENDOR)),
-        (std::strncmp(vendorString, nvidiaVendorString, sizeof(nvidiaVendorString)) == 0 ||
+        vendorString && (std::strncmp(vendorString, nvidiaVendorString, sizeof(nvidiaVendorString)) == 0 ||
          #ifdef CORRADE_TARGET_WINDOWS
          std::strncmp(vendorString, intelVendorString, sizeof(intelVendorString)) == 0 ||
          #endif
@@ -506,8 +521,15 @@ void GlfwApplication::setupCallbacks() {
             app.mouseReleaseEvent(e);
     });
     glfwSetCursorPosCallback(_window, [](GLFWwindow* const window, const double x, const double y) {
-        MouseMoveEvent e{window, Vector2i{Int(x), Int(y)}};
-        static_cast<GlfwApplication*>(glfwGetWindowUserPointer(window))->mouseMoveEvent(e);
+        auto& app = *static_cast<GlfwApplication*>(glfwGetWindowUserPointer(window));
+        /* Avoid bogus offset at first -- report 0 when the event is called for
+           the first time */
+        Vector2i position{Int(x), Int(y)};
+        MouseMoveEvent e{window, position,
+            app._previousMouseMovePosition == Vector2i{-1} ? Vector2i{} :
+            position - app._previousMouseMovePosition};
+        app._previousMouseMovePosition = position;
+        app.mouseMoveEvent(e);
     });
     glfwSetScrollCallback(_window, [](GLFWwindow* window, double xoffset, double yoffset) {
         MouseScrollEvent e(window, Vector2{Float(xoffset), Float(yoffset)});

@@ -25,6 +25,7 @@
 
 #include "WindowlessEglApplication.h"
 
+#include <cstring>
 #include <string>
 #include <Corrade/Utility/Assert.h>
 #include <Corrade/Utility/Debug.h>
@@ -38,11 +39,82 @@
 #include <Corrade/Containers/ArrayView.h>
 #endif
 
+#ifndef EGL_EXT_device_base
+typedef void *EGLDeviceEXT;
+#endif
+
+#ifndef EGL_EXT_platform_device
+#define EGL_PLATFORM_DEVICE_EXT 0x313F
+#endif
+
 namespace Magnum { namespace Platform {
 
+namespace {
+
+bool extensionSupported(const char* const extensions, Containers::ArrayView<const char> extension) {
+    CORRADE_INTERNAL_ASSERT(extensions);
+    const char* pos = std::strstr(extensions, extension);
+    /* Extension is supported if its string is delimited by a space or end of
+       the extension list. The extension.size() is the whole C array including
+       a 0-terminator, so subtract 1 to look at one character after. */
+    return pos && (pos[extension.size() - 1] == ' ' || pos[extension.size() - 1] == '\0');
+}
+
+}
+
 WindowlessEglContext::WindowlessEglContext(const Configuration& configuration, GLContext* const magnumContext) {
-    /* Initialize */
-    _display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    /* If relevant extensions are supported, try to find some display using
+       those APIs, as that works reliably also when running headless. This
+       would ideally use EGL 1.5 APIs but since we still want to support
+       systems which either have old EGL headers or old EGL implementation,
+       we'd need to have a code path for 1.4 *and* 1.5, plus do complicated
+       version parsing from a string. Not feeling like doing that today, no. */
+    const char* const extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+    if(extensions &&
+        /* eglQueryDevicesEXT(). NVidia exposes only EGL_EXT_device_base, which
+           is an older version of EGL_EXT_device_enumeration before it got
+           split to that and EGL_EXT_device_query, so test for both. */
+        (extensionSupported(extensions, "EGL_EXT_device_enumeration") || extensionSupported(extensions, "EGL_EXT_device_base")) &&
+
+        /* eglGetPlatformDisplayEXT() */
+        extensionSupported(extensions, "EGL_EXT_platform_base") &&
+
+        /* EGL_PLATFORM_DEVICE_EXT (FFS, why it has to be scattered over a
+           thousand extensions?!). This is supported only since Mesa 19.2. */
+        extensionSupported(extensions, "EGL_EXT_platform_device")
+    ) {
+        EGLint count;
+        auto eglQueryDevices = reinterpret_cast<EGLBoolean(*)(EGLint, EGLDeviceEXT*, EGLint*)>(eglGetProcAddress("eglQueryDevicesEXT"));
+        if(!eglQueryDevices(0, nullptr, &count)) {
+            Error{} << "Platform::WindowlessEglApplication::tryCreateContext(): cannot query EGL devices:" << Implementation::eglErrorString(eglGetError());
+            return;
+        }
+
+        if(!count) {
+            Error{} << "Platform::WindowlessEglApplication::tryCreateContext(): no EGL devices found";
+            return;
+        }
+
+        if(magnumContext && (magnumContext->internalFlags() >= GL::Context::InternalFlag::DisplayVerboseInitializationLog)) {
+            Debug{} << "Platform::WindowlessEglApplication: found" << count << "EGL devices, choosing the first one";
+        }
+
+        /* Assuming the same thing won't suddenly start failing when called the
+           second time */
+        EGLDeviceEXT device;
+        CORRADE_INTERNAL_ASSERT_OUTPUT(eglQueryDevices(1, &device, &count));
+
+        if(!(_display = reinterpret_cast<EGLDisplay(*)(EGLenum, void*, const EGLint*)>(eglGetProcAddress("eglGetPlatformDisplayEXT"))(EGL_PLATFORM_DEVICE_EXT, device, nullptr))) {
+            Error{} << "Platform::WindowlessEglApplication::tryCreateContext(): cannot get platform display for a device:" << Implementation::eglErrorString(eglGetError());
+            return;
+        }
+
+    /* Otherwise initialize the classic way */
+    } else if(!(_display = eglGetDisplay(EGL_DEFAULT_DISPLAY))) {
+        Error{} << "Platform::WindowlessEglApplication::tryCreateContext(): cannot get default EGL display:" << Implementation::eglErrorString(eglGetError());
+        return;
+    }
+
     if(!eglInitialize(_display, nullptr, nullptr)) {
         Error() << "Platform::WindowlessEglApplication::tryCreateContext(): cannot initialize EGL:" << Implementation::eglErrorString(eglGetError());
         return;
@@ -90,6 +162,23 @@ WindowlessEglContext::WindowlessEglContext(const Configuration& configuration, G
         return;
     }
 
+    #ifndef MAGNUM_TARGET_WEBGL
+    /* Request debug context if --magnum-gpu-validation is enabled */
+    Configuration::Flags flags = configuration.flags();
+    if(magnumContext && magnumContext->internalFlags() & GL::Context::InternalFlag::GpuValidation)
+        flags |= Configuration::Flag::Debug;
+    #endif
+
+    #ifndef MAGNUM_TARGET_GLES
+    /* NVidia doesn't like EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE_BIT_KHR for
+       some reason, failing eglCreateContext() with EGL_BAD_MATCH. If this flag
+       is set, wipe it away. */
+    const char* vendor = eglQueryString(_display, EGL_VENDOR);
+    if((flags & Configuration::Flag::ForwardCompatible) && vendor && std::strcmp(vendor, "NVIDIA") == 0 && (!magnumContext || !magnumContext->isDriverWorkaroundDisabled("nv-egl-forward-compatible-context-unhappy"))) {
+        flags &= ~Configuration::Flag::ForwardCompatible;
+    }
+    #endif
+
     #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_WEBGL)
     const /* Is modified below to work around a SwiftShader limitation */
     #endif
@@ -111,26 +200,24 @@ WindowlessEglContext::WindowlessEglContext(const Configuration& configuration, G
         #ifndef MAGNUM_TARGET_WEBGL
         /* Needs to be last because we're zeroing this out for SwiftShader (see
            below) */
-        EGL_CONTEXT_FLAGS_KHR, EGLint(configuration.flags()),
+        EGL_CONTEXT_FLAGS_KHR, EGLint(flags),
         #endif
         EGL_NONE
     };
 
     #ifdef MAGNUM_TARGET_WEBGL
     static_cast<void>(configuration);
-    #endif
-    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_WEBGL)
     static_cast<void>(magnumContext);
     #endif
 
     #if defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_WEBGL)
-    const std::string version = eglQueryString(_display, EGL_VERSION);
+    const char* version = eglQueryString(_display, EGL_VERSION);
 
     /* SwiftShader 3.3.0.1 blows up on encountering EGL_CONTEXT_FLAGS_KHR with
        a zero value, so erase these. It also doesn't handle them as correct
        flags, but instead checks for the whole value, so a combination won't
        work either: https://github.com/google/swiftshader/blob/5fb5e817a20d3e60f29f7338493f922b5ac9d7c4/src/OpenGL/libEGL/libEGL.cpp#L794-L8104 */
-    if(!configuration.flags() && version.find("SwiftShader") != std::string::npos && (!magnumContext || !magnumContext->isDriverWorkaroundDisabled("swiftshader-no-empty-egl-context-flags"))) {
+    if(!configuration.flags() && version && std::strstr(version, "SwiftShader") != nullptr && (!magnumContext || !magnumContext->isDriverWorkaroundDisabled("swiftshader-no-empty-egl-context-flags"))) {
         auto& contextFlags = attributes[Containers::arraySize(attributes) - 3];
         CORRADE_INTERNAL_ASSERT(contextFlags == EGL_CONTEXT_FLAGS_KHR);
         contextFlags = EGL_NONE;
@@ -145,7 +232,7 @@ WindowlessEglContext::WindowlessEglContext(const Configuration& configuration, G
     #if defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_WEBGL)
     /* SwiftShader 3.3.0.1 needs some pbuffer, otherwise it crashes somewhere
        deep inside when making the context current */
-    if(version.find("SwiftShader") != std::string::npos && (!magnumContext || !magnumContext->isDriverWorkaroundDisabled("swiftshader-egl-context-needs-pbuffer"))) {
+    if(version && std::strstr(version, "SwiftShader") != nullptr && (!magnumContext || !magnumContext->isDriverWorkaroundDisabled("swiftshader-egl-context-needs-pbuffer"))) {
         EGLint surfaceAttributes[] = {
             EGL_WIDTH, 32,
             EGL_HEIGHT, 32,

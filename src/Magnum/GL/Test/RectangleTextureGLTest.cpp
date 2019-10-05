@@ -27,6 +27,7 @@
 #include <Corrade/TestSuite/Compare/Container.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/GL/Context.h"
 #include "Magnum/GL/Extensions.h"
 #include "Magnum/GL/BufferImage.h"
@@ -58,17 +59,24 @@ struct RectangleTextureGLTest: OpenGLTester {
     void storage();
 
     void image();
-    void compressedImage();
     void imageBuffer();
-    void compressedImageBuffer();
+    void imageQueryView();
     void subImage();
-    void compressedSubImage();
     void subImageBuffer();
-    void compressedSubImageBuffer();
     void subImageQuery();
-    void compressedSubImageQuery();
+    void subImageQueryView();
     void subImageQueryBuffer();
+    /* View query assertions tested in AbstractTextureGLTest */
+
+    void compressedImage();
+    void compressedImageBuffer();
+    void compressedImageQueryView();
+    void compressedSubImage();
+    void compressedSubImageBuffer();
+    void compressedSubImageQuery();
+    void compressedSubImageQueryView();
     void compressedSubImageQueryBuffer();
+    /* View query assertions tested in AbstractTextureGLTest */
 
     void invalidateImage();
     void invalidateSubImage();
@@ -124,17 +132,21 @@ RectangleTextureGLTest::RectangleTextureGLTest() {
     addInstancedTests({
         &RectangleTextureGLTest::image,
         &RectangleTextureGLTest::imageBuffer,
+        &RectangleTextureGLTest::imageQueryView,
         &RectangleTextureGLTest::subImage,
         &RectangleTextureGLTest::subImageBuffer,
         &RectangleTextureGLTest::subImageQuery,
+        &RectangleTextureGLTest::subImageQueryView,
         &RectangleTextureGLTest::subImageQueryBuffer},
         Containers::arraySize(PixelStorageData));
 
     addTests({&RectangleTextureGLTest::compressedImage,
               &RectangleTextureGLTest::compressedImageBuffer,
+              &RectangleTextureGLTest::compressedImageQueryView,
               &RectangleTextureGLTest::compressedSubImage,
               &RectangleTextureGLTest::compressedSubImageBuffer,
               &RectangleTextureGLTest::compressedSubImageQuery,
+              &RectangleTextureGLTest::compressedSubImageQueryView,
               &RectangleTextureGLTest::compressedSubImageQueryBuffer,
 
               &RectangleTextureGLTest::invalidateImage,
@@ -221,8 +233,8 @@ void RectangleTextureGLTest::bindImage() {
 }
 
 template<class T> void RectangleTextureGLTest::sampling() {
-    setTestCaseName(std::is_same<T, GenericSampler>::value ?
-        "sampling<GenericSampler>" : "sampling<GLSampler>");
+    setTestCaseTemplateName(std::is_same<T, GenericSampler>::value ?
+        "GenericSampler" : "GLSampler");
 
     if(!Context::current().isExtensionSupported<Extensions::ARB::texture_rectangle>())
         CORRADE_SKIP(Extensions::ARB::texture_rectangle::string() + std::string(" is not supported."));
@@ -357,6 +369,32 @@ void RectangleTextureGLTest::imageBuffer() {
         TestSuite::Compare::Container);
 }
 
+void RectangleTextureGLTest::imageQueryView() {
+    setTestCaseDescription(PixelStorageData[testCaseInstanceId()].name);
+
+    if(!Context::current().isExtensionSupported<Extensions::ARB::texture_rectangle>())
+        CORRADE_SKIP(Extensions::ARB::texture_rectangle::string() + std::string(" is not supported."));
+
+    RectangleTexture texture;
+    texture.setImage(TextureFormat::RGBA8, ImageView2D{
+        PixelStorageData[testCaseInstanceId()].storage,
+        PixelFormat::RGBA, PixelType::UnsignedByte, Vector2i(2),
+        PixelStorageData[testCaseInstanceId()].dataSparse});
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    Containers::Array<char> data{PixelStorageData[testCaseInstanceId()].offset + 2*2*4};
+    MutableImageView2D image{PixelStorageData[testCaseInstanceId()].storage, PixelFormat::RGBA, PixelType::UnsignedByte, Vector2i{2}, data};
+    texture.image(image);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    CORRADE_COMPARE(image.size(), Vector2i(2));
+    CORRADE_COMPARE_AS(Containers::arrayCast<UnsignedByte>(image.data()).suffix(PixelStorageData[testCaseInstanceId()].offset),
+        PixelStorageData[testCaseInstanceId()].data,
+        TestSuite::Compare::Container);
+}
+
 constexpr UnsignedByte Zero[4*4*4]{};
 constexpr UnsignedByte SubDataComplete[]{
     0, 0, 0, 0,    0,    0,    0,    0,    0,    0,    0,    0, 0, 0, 0, 0,
@@ -444,6 +482,32 @@ void RectangleTextureGLTest::subImageQuery() {
         TestSuite::Compare::Container);
 }
 
+void RectangleTextureGLTest::subImageQueryView() {
+    setTestCaseDescription(PixelStorageData[testCaseInstanceId()].name);
+
+    if(!Context::current().isExtensionSupported<Extensions::ARB::texture_rectangle>())
+        CORRADE_SKIP(Extensions::ARB::texture_rectangle::string() + std::string(" is not supported."));
+    if(!Context::current().isExtensionSupported<Extensions::ARB::get_texture_sub_image>())
+        CORRADE_SKIP(Extensions::ARB::get_texture_sub_image::string() + std::string(" is not supported."));
+
+    RectangleTexture texture;
+    texture.setStorage(TextureFormat::RGBA8, Vector2i{4})
+           .setSubImage({}, ImageView2D{PixelFormat::RGBA, PixelType::UnsignedByte, Vector2i{4}, SubDataComplete});
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    Containers::Array<char> data{PixelStorageData[testCaseInstanceId()].offset + 2*2*4};
+    MutableImageView2D image{PixelStorageData[testCaseInstanceId()].storage, PixelFormat::RGBA, PixelType::UnsignedByte, Vector2i{2}, data};
+    texture.subImage(Range2Di::fromSize(Vector2i{1}, Vector2i{2}), image);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    CORRADE_COMPARE(image.size(), Vector2i{2});
+    CORRADE_COMPARE_AS(Containers::arrayCast<UnsignedByte>(image.data()).suffix(PixelStorageData[testCaseInstanceId()].offset),
+        PixelStorageData[testCaseInstanceId()].data,
+        TestSuite::Compare::Container);
+}
+
 void RectangleTextureGLTest::subImageQueryBuffer() {
     setTestCaseDescription(PixelStorageData[testCaseInstanceId()].name);
 
@@ -479,6 +543,10 @@ void RectangleTextureGLTest::compressedImageBuffer() {
     CORRADE_SKIP("No rectangle texture compression format exists.");
 }
 
+void RectangleTextureGLTest::compressedImageQueryView() {
+    CORRADE_SKIP("No rectangle texture compression format exists.");
+}
+
 void RectangleTextureGLTest::compressedSubImage() {
     CORRADE_SKIP("No rectangle texture compression format exists.");
 }
@@ -488,6 +556,10 @@ void RectangleTextureGLTest::compressedSubImageBuffer() {
 }
 
 void RectangleTextureGLTest::compressedSubImageQuery() {
+    CORRADE_SKIP("No rectangle texture compression format exists.");
+}
+
+void RectangleTextureGLTest::compressedSubImageQueryView() {
     CORRADE_SKIP("No rectangle texture compression format exists.");
 }
 

@@ -73,7 +73,9 @@ class DistanceFieldShader: public GL::AbstractShaderProgram {
 
     private:
         /* ES2 on iOS (apparently independent on the device) has only 8 texture
-           units, so be careful to not step over that. ES3 on the same has 16. */
+           units, so be careful to not step over that. ES3 on the same has 16.
+           Not using the default (0) because this shader is quite specific.
+           Unit 6 is used by Shaders::Vector and Shaders::DistanceFieldVector. */
         enum: Int { TextureUnit = 7 };
 
         Int scalingUniform{0},
@@ -106,7 +108,10 @@ DistanceFieldShader::DistanceFieldShader(const UnsignedInt radius) {
 
     attachShaders({vert, frag});
 
-    if(!GL::Context::current().isExtensionSupported<GL::Extensions::MAGNUM::shader_vertex_id>()) {
+    #ifndef MAGNUM_TARGET_GLES2
+    if(!GL::Context::current().isExtensionSupported<GL::Extensions::MAGNUM::shader_vertex_id>())
+    #endif
+    {
         bindAttributeLocation(Position::Location, "position");
     }
 
@@ -154,7 +159,9 @@ DistanceField::DistanceField(const UnsignedInt radius): _state{new State{radius}
     _state->mesh.setPrimitive(GL::MeshPrimitive::Triangles)
         .setCount(3);
 
+    #ifndef MAGNUM_TARGET_GLES2
     if(!GL::Context::current().isExtensionSupported<GL::Extensions::MAGNUM::shader_vertex_id>())
+    #endif
     {
         constexpr Vector2 triangle[] = {
             Vector2(-1.0,  1.0),

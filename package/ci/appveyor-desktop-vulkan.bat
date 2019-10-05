@@ -1,5 +1,4 @@
-if "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" call "C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Auxiliary/Build/vcvarsall.bat" x64 || exit /b
-if "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2015" call "C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat" x64 || exit /b
+if "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2019" call "C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Auxiliary/Build/vcvarsall.bat" x64 || exit /b
 set PATH=%APPVEYOR_BUILD_FOLDER%/openal/bin/Win64;%APPVEYOR_BUILD_FOLDER%\deps\bin;%PATH%
 
 rem Build Corrade
@@ -21,12 +20,13 @@ rem a separate build for now.
 cl.exe /c package/ci/libvulkan.cpp || exit /b
 lib.exe /OUT:%APPVEYOR_BUILD_FOLDER%/deps/lib/libvulkan.lib libvulkan.obj || exit /b
 
-rem Enabling only stuff that's directly affected by Vulkan, disabling
-rem everything else.
+rem Enabling only stuff that's directly affected by Vulkan (which means also
+rem parts of Platform), disabling everything else.
 mkdir build && cd build || exit /b
 cmake .. ^
     -DCMAKE_BUILD_TYPE=Debug ^
     -DCMAKE_INSTALL_PREFIX=%APPVEYOR_BUILD_FOLDER%/deps ^
+    -DCMAKE_PREFIX_PATH=%APPVEYOR_BUILD_FOLDER%/SDL ^
     -DVulkan_LIBRARY=%APPVEYOR_BUILD_FOLDER%/deps/lib/libvulkan.lib ^
     -DWITH_AUDIO=OFF ^
     -DWITH_DEBUGTOOLS=OFF ^
@@ -54,6 +54,8 @@ cmake .. ^
     -DWITH_IMAGECONVERTER=OFF ^
     -DWITH_GL_INFO=OFF ^
     -DWITH_AL_INFO=OFF ^
+    -DWITH_SDL2APPLICATION=ON ^
+    -DWITH_GLFWAPPLICATION=ON ^
     -DBUILD_TESTS=ON ^
     -DBUILD_GL_TESTS=OFF ^
     -G Ninja || exit /b

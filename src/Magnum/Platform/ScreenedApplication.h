@@ -37,17 +37,84 @@
 
 namespace Magnum { namespace Platform {
 
+namespace Implementation {
+
+CORRADE_HAS_TYPE(HasKeyEvent, typename T::KeyEvent);
+CORRADE_HAS_TYPE(HasMouseScrollEvent, typename T::MouseScrollEvent);
+CORRADE_HAS_TYPE(HasTextInputEvent, typename T::TextInputEvent);
+CORRADE_HAS_TYPE(HasTextEditingEvent, typename T::TextEditingEvent);
+
+/* Calls into the screen in case the application has a key*Event(), otherwise
+   provides a dummy virtual so the application can unconditionally override */
+template<class Application, bool> struct ApplicationKeyEventMixin {
+    typedef int KeyEvent;
+    virtual void keyPressEvent(KeyEvent&) = 0;
+    virtual void keyReleaseEvent(KeyEvent&) = 0;
+
+    void callKeyPressEvent(KeyEvent&, Containers::LinkedList<BasicScreen<Application>>&);
+    void callKeyReleaseEvent(KeyEvent&, Containers::LinkedList<BasicScreen<Application>>&);
+};
+template<class Application> struct ApplicationKeyEventMixin<Application, true> {
+    void callKeyPressEvent(typename Application::KeyEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens);
+    void callKeyReleaseEvent(typename Application::KeyEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens);
+};
+
+/* Calls into the screen in case the application has a mouseScrollEvent(),
+   otherwise provides a dummy virtual so the application can unconditionally
+   override */
+template<class Application, bool> struct ApplicationMouseScrollEventMixin {
+    typedef int MouseScrollEvent;
+    virtual void mouseScrollEvent(MouseScrollEvent&) = 0;
+
+    void callMouseScrollEvent(MouseScrollEvent&, Containers::LinkedList<BasicScreen<Application>>&);
+};
+template<class Application> struct ApplicationMouseScrollEventMixin<Application, true> {
+    void callMouseScrollEvent(typename Application::MouseScrollEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens);
+};
+
+/* Calls into the screen in case the application has a textInputEvent(),
+   otherwise provides a dummy virtual so the application can unconditionally
+   override */
+template<class Application, bool> struct ApplicationTextInputEventMixin {
+    typedef int TextInputEvent;
+    virtual void textInputEvent(TextInputEvent&) = 0;
+
+    void callTextInputEvent(TextInputEvent&, Containers::LinkedList<BasicScreen<Application>>&);
+};
+template<class Application> struct ApplicationTextInputEventMixin<Application, true> {
+    void callTextInputEvent(typename Application::TextInputEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens);
+};
+
+/* Calls into the screen in case the application has a textEditingEvent(),
+   otherwise provides a dummy virtual so the application can unconditionally
+   override */
+template<class Application, bool> struct ApplicationTextEditingEventMixin {
+    typedef int TextEditingEvent;
+    virtual void textEditingEvent(TextEditingEvent&) = 0;
+
+    void callTextEditingEvent(TextEditingEvent&, Containers::LinkedList<BasicScreen<Application>>&);
+};
+template<class Application> struct ApplicationTextEditingEventMixin<Application, true> {
+    void callTextEditingEvent(typename Application::TextEditingEvent& event, Containers::LinkedList<BasicScreen<Application>>& screens);
+};
+
+}
+
 /**
 @brief Base for applications with screen management
 
-Manages list of screens and propagates events to them.
+@m_keywords{ScreenedApplication}
 
-If exactly one application header is included, this class is also aliased to
+Manages list of screens and propagates events to them. If exactly one
+application header is included, this class is also aliased to
 @cpp Platform::ScreenedApplication @ce.
 
-Each @ref BasicScreen "Screen" specifies which set of events should be
-propagated to it using @ref BasicScreen::setPropagatedEvents(). When
-application gets an event, they are propagated to the screens:
+When you derive from this class, you're not allowed to implement any
+usual application event handlers --- instead, these are propagated to
+@ref BasicScreen "Screen" instances that get added using @ref addScreen(). Each
+@ref BasicScreen "Screen" specifies which set of events should be propagated to
+it using @ref BasicScreen::setPropagatedEvents(). When the application gets an
+event, they are propagated to the screens:
 
 -   @ref Sdl2Application::viewportEvent() "viewportEvent()" is propagated to
     all screens.
@@ -57,46 +124,60 @@ application gets an event, they are propagated to the screens:
 -   Input events (@ref Sdl2Application::keyPressEvent() "keyPressEvent()",
     @ref Sdl2Application::keyReleaseEvent() "keyReleaseEvent()",
     @ref Sdl2Application::mousePressEvent() "mousePressEvent()",
-    @ref Sdl2Application::mouseReleaseEvent() "mouseReleaseEvent()"
-    and @ref Sdl2Application::mouseMoveEvent() "mouseMoveEvent()")
+    @ref Sdl2Application::mouseReleaseEvent() "mouseReleaseEvent()",
+    @ref Sdl2Application::mouseMoveEvent() "mouseMoveEvent()",
+    @ref Sdl2Application::mouseMoveEvent() "mouseScrollEvent()",
+    @ref Sdl2Application::textInputEvent() "textInputEvent()" and
+    @ref Sdl2Application::textEditingEvent() "textEditingEvent()")
     are propagated in front-to-back order to screens which have
     @ref BasicScreen::PropagatedEvent::Input enabled. If any screen sets the
     event as accepted, it is not propagated further.
+
+For the actual application, at the very least you need to implement
+@ref globalDrawEvent(), and in case your application is resizable,
+@ref globalViewportEvent() as well. The global draw event gets called *after*
+all @ref BasicScreen::drawEvent() "Screen::drawEvent()" in order to make it
+possible for you to do a buffer swap, while the global viewport event gets
+called *before* all @ref BasicScreen::viewportEvent() "Screen::viewportEvent()",
+in this case to make it possible to handle viewport changes on the default
+framebuffer:
+
+@snippet MagnumPlatform.cpp ScreenedApplication-global-events
 
 Uses @ref Corrade::Containers::LinkedList for efficient screen management.
 Traversing front-to-back through the list of screens can be done using
 range-based for:
 
-@code{.cpp}
-MyApplication app;
-for(Screen& screen: app.screens()) {
-    // ...
-}
-@endcode
+@snippet MagnumPlatform.cpp ScreenedApplication-for-range
 
 Or, if you need more flexibility, like in the following code. Traversing
 back-to-front can be done using @ref Corrade::Containers::LinkedList::last()
 and @ref BasicScreen::nextNearerScreen().
 
-@code{.cpp}
-for(Screen* s = app.screens().first(); s; s = s->nextFartherScreen()) {
-    // ...
-}
-@endcode
+@snippet MagnumPlatform.cpp ScreenedApplication-for
 
 @section Platform-ScreenedApplication-template-specializations Explicit template specializations
 
 The following specialization are explicitly compiled into each particular
-`*Application` library. For other specializations you have to use
+`*Application` library. For other specializations you have to use the
 @ref ScreenedApplication.hpp implementation file to avoid linker errors. See
 @ref compilation-speedup-hpp for more information.
 
+-   @ref AndroidApplication "BasicScreenedApplication<AndroidApplication>"
+-   @ref EmscriptenApplication "BasicScreenedApplication<EmscriptenApplication>"
 -   @ref GlfwApplication "BasicScreenedApplication<GlfwApplication>"
 -   @ref GlxApplication "BasicScreenedApplication<GlxApplication>"
 -   @ref Sdl2Application "BasicScreenedApplication<Sdl2Application>"
 -   @ref XEglApplication "BasicScreenedApplication<XEglApplication>"
 */
-template<class Application> class BasicScreenedApplication: public Application, private Containers::LinkedList<BasicScreen<Application>> {
+template<class Application> class BasicScreenedApplication:
+    public Application,
+    private Containers::LinkedList<BasicScreen<Application>>,
+    private Implementation::ApplicationKeyEventMixin<Application, Implementation::HasKeyEvent<Application>::value>,
+    private Implementation::ApplicationMouseScrollEventMixin<Application, Implementation::HasMouseScrollEvent<Application>::value>,
+    private Implementation::ApplicationTextInputEventMixin<Application, Implementation::HasTextInputEvent<Application>::value>,
+    private Implementation::ApplicationTextEditingEventMixin<Application, Implementation::HasTextEditingEvent<Application>::value>
+{
     public:
         #ifdef MAGNUM_TARGET_GL
         /**
@@ -138,6 +219,12 @@ template<class Application> class BasicScreenedApplication: public Application, 
          * added, @ref BasicScreen::focusEvent() is called. If not, neither
          * @ref BasicScreen::blurEvent() nor @ref BasicScreen::focusEvent() is
          * called (i.e. the screen default state is used).
+         *
+         * Alternatively, a screen can be created using the
+         * @ref BasicScreen::BasicScreen(BasicScreenedApplication<Application>&, PropagatedEvents)
+         * constructor. In that case, the first @ref BasicScreen::focusEvent()
+         * is not called, assuming the screen is put into desired state already
+         * during construction.
          */
         BasicScreenedApplication<Application>& addScreen(BasicScreen<Application>& screen);
 
@@ -178,16 +265,24 @@ template<class Application> class BasicScreenedApplication: public Application, 
             return static_cast<const Containers::LinkedList<BasicScreen<Application>>&>(*this);
         }
 
+        #if defined(MAGNUM_BUILD_DEPRECATED) && !defined(DOXYGEN_GENERATING_OUTPUT)
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") BasicScreenedApplication<Application>* operator->() { return this; }
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") const BasicScreenedApplication<Application>* operator->() const { return this; }
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") BasicScreenedApplication<Application>& operator*() { return *this; }
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") const BasicScreenedApplication<Application>& operator*() const { return *this; }
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") operator BasicScreenedApplication<Application>*() { return this; }
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") operator const BasicScreenedApplication<Application>*() const { return this; }
+        template<class T, class = typename std::enable_if<std::is_base_of<BasicScreenedApplication<Application>, T>::value>::type> CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") operator T*() { return static_cast<T*>(this); }
+        template<class T, class = typename std::enable_if<std::is_base_of<BasicScreenedApplication<Application>, T>::value>::type> CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now") operator const T*() const { return static_cast<const T*>(this); }
+        CORRADE_DEPRECATED("Platform::Screen::application() returns a reference now, use hasApplication() instead") bool operator!() const { return false; }
+        #endif
+
     protected:
         /* Nobody will need to have (and delete) ScreenedApplication*, thus
            this is faster than public pure virtual destructor */
         ~BasicScreenedApplication();
 
-    #ifdef DOXYGEN_GENERATING_OUTPUT
-    protected:
-    #else
     private:
-    #endif
         /**
          * @brief Global viewport event
          *
@@ -208,7 +303,6 @@ template<class Application> class BasicScreenedApplication: public Application, 
          */
         virtual void globalDrawEvent() = 0;
 
-    private:
         #ifndef DOXYGEN_GENERATING_OUTPUT /* https://bugzilla.gnome.org/show_bug.cgi?id=776986 */
         friend Containers::LinkedList<BasicScreen<Application>>;
         friend Containers::LinkedListItem<BasicScreen<Application>, BasicScreenedApplication<Application>>;
@@ -219,11 +313,17 @@ template<class Application> class BasicScreenedApplication: public Application, 
            to attached screens. */
         void viewportEvent(typename Application::ViewportEvent& event) override final;
         void drawEvent() override final;
-        void keyPressEvent(typename Application::KeyEvent& event) override final;
-        void keyReleaseEvent(typename Application::KeyEvent& event) override final;
         void mousePressEvent(typename Application::MouseEvent& event) override final;
         void mouseReleaseEvent(typename Application::MouseEvent& event) override final;
         void mouseMoveEvent(typename Application::MouseMoveEvent& event) override final;
+
+        /* These events are not available in all cases, so if the Application
+           doesn't have them, they're overriding a mixin dummy */
+        void keyPressEvent(typename BasicScreenedApplication<Application>::KeyEvent& event) override final;
+        void keyReleaseEvent(typename BasicScreenedApplication<Application>::KeyEvent& event) override final;
+        void mouseScrollEvent(typename BasicScreenedApplication<Application>::MouseScrollEvent& event) override final;
+        void textInputEvent(typename BasicScreenedApplication<Application>::TextInputEvent& event) override final;
+        void textEditingEvent(typename BasicScreenedApplication<Application>::TextEditingEvent& event) override final;
 };
 
 }}

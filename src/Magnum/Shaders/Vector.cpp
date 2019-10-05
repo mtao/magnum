@@ -31,6 +31,9 @@
 #include "Magnum/GL/Context.h"
 #include "Magnum/GL/Extensions.h"
 #include "Magnum/GL/Shader.h"
+#include "Magnum/Math/Color.h"
+#include "Magnum/Math/Matrix3.h"
+#include "Magnum/Math/Matrix4.h"
 
 #include "Magnum/Shaders/Implementation/CreateCompatibilityShader.h"
 
@@ -61,21 +64,23 @@ template<UnsignedInt dimensions> Vector<dimensions>::Vector() {
 
     vert.addSource(rs.get("generic.glsl"))
         .addSource(rs.get(vertexShaderName<dimensions>()));
-    frag.addSource(rs.get("Vector.frag"));
+    frag.addSource(rs.get("generic.glsl"))
+        .addSource(rs.get("Vector.frag"));
 
     CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
 
     GL::AbstractShaderProgram::attachShaders({vert,  frag});
 
+    /* ES3 has this done in the shader directly */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
     #ifndef MAGNUM_TARGET_GLES
     if(!GL::Context::current().isExtensionSupported<GL::Extensions::ARB::explicit_attrib_location>(version))
-    #else
-    if(!GL::Context::current().isVersionSupported(GL::Version::GLES300))
     #endif
     {
         GL::AbstractShaderProgram::bindAttributeLocation(AbstractVector<dimensions>::Position::Location, "position");
         GL::AbstractShaderProgram::bindAttributeLocation(AbstractVector<dimensions>::TextureCoordinates::Location, "textureCoordinates");
     }
+    #endif
 
     CORRADE_INTERNAL_ASSERT_OUTPUT(GL::AbstractShaderProgram::link());
 
@@ -100,6 +105,21 @@ template<UnsignedInt dimensions> Vector<dimensions>::Vector() {
     setTransformationProjectionMatrix({});
     setColor(Color4{1.0f}); /* Background color is zero by default */
     #endif
+}
+
+template<UnsignedInt dimensions> Vector<dimensions>& Vector<dimensions>::setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix) {
+    GL::AbstractShaderProgram::setUniform(_transformationProjectionMatrixUniform, matrix);
+    return *this;
+}
+
+template<UnsignedInt dimensions> Vector<dimensions>& Vector<dimensions>::setBackgroundColor(const Color4& color) {
+    GL::AbstractShaderProgram::setUniform(_backgroundColorUniform, color);
+    return *this;
+}
+
+template<UnsignedInt dimensions> Vector<dimensions>& Vector<dimensions>::setColor(const Color4& color) {
+    GL::AbstractShaderProgram::setUniform(_colorUniform, color);
+    return *this;
 }
 
 template class Vector<2>;

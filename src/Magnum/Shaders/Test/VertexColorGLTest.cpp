@@ -23,83 +23,319 @@
     DEALINGS IN THE SOFTWARE.
 */
 
+#include <Corrade/Containers/StridedArrayView.h>
+#include <Corrade/PluginManager/Manager.h>
+#include <Corrade/Utility/Directory.h>
+
+#include "Magnum/DebugTools/CompareImage.h"
+#include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
+#include "Magnum/PixelFormat.h"
 #include "Magnum/GL/OpenGLTester.h"
+#include "Magnum/GL/Framebuffer.h"
+#include "Magnum/GL/Mesh.h"
+#include "Magnum/GL/Renderbuffer.h"
+#include "Magnum/GL/RenderbufferFormat.h"
+#include "Magnum/Math/Color.h"
+#include "Magnum/Math/Matrix3.h"
+#include "Magnum/Math/Matrix4.h"
+#include "Magnum/MeshTools/Compile.h"
+#include "Magnum/Primitives/Circle.h"
+#include "Magnum/Primitives/UVSphere.h"
 #include "Magnum/Shaders/VertexColor.h"
+#include "Magnum/Trade/AbstractImporter.h"
+#include "Magnum/Trade/MeshData2D.h"
+#include "Magnum/Trade/MeshData3D.h"
+
+#include "configure.h"
 
 namespace Magnum { namespace Shaders { namespace Test { namespace {
 
 struct VertexColorGLTest: GL::OpenGLTester {
     explicit VertexColorGLTest();
 
-    void construct2D();
-    void construct3D();
+    template<UnsignedInt dimensions> void construct();
+    template<UnsignedInt dimensions> void constructMove();
 
-    void constructMove2D();
-    void constructMove3D();
+    void renderSetup();
+    void renderTeardown();
+
+    template<class T> void renderDefaults2D();
+    template<class T> void renderDefaults3D();
+
+    template<class T> void render2D();
+    template<class T> void render3D();
+
+    private:
+        PluginManager::Manager<Trade::AbstractImporter> _manager{"nonexistent"};
+
+        GL::Renderbuffer _color{NoCreate};
+        #ifndef MAGNUM_TARGET_GLES2
+        GL::Renderbuffer _objectId{NoCreate};
+        #endif
+        GL::Framebuffer _framebuffer{NoCreate};
 };
 
+/*
+    Rendering tests done on:
+
+    -   Mesa Intel
+    -   Mesa AMD
+    -   SwiftShader ES2/ES3
+    -   ARM Mali (Huawei P10) ES2/ES3
+    -   WebGL 1 / 2 (on Mesa Intel)
+*/
+
+using namespace Math::Literals;
+
 VertexColorGLTest::VertexColorGLTest() {
-    addTests({&VertexColorGLTest::construct2D,
-              &VertexColorGLTest::construct3D,
+    addTests<VertexColorGLTest>({
+        &VertexColorGLTest::construct<2>,
+        &VertexColorGLTest::construct<3>,
+        &VertexColorGLTest::constructMove<2>,
+        &VertexColorGLTest::constructMove<3>});
 
-              &VertexColorGLTest::constructMove2D,
-              &VertexColorGLTest::constructMove3D});
+    addTests({&VertexColorGLTest::renderDefaults2D<Color3>,
+              &VertexColorGLTest::renderDefaults2D<Color4>,
+              &VertexColorGLTest::renderDefaults3D<Color3>,
+              &VertexColorGLTest::renderDefaults3D<Color4>,
+
+              &VertexColorGLTest::render2D<Color3>,
+              &VertexColorGLTest::render2D<Color4>,
+              &VertexColorGLTest::render3D<Color3>,
+              &VertexColorGLTest::render3D<Color4>},
+        &VertexColorGLTest::renderSetup,
+        &VertexColorGLTest::renderTeardown);
+
+    /* Load the plugins directly from the build tree. Otherwise they're either
+       static and already loaded or not present in the build tree */
+    #ifdef ANYIMAGEIMPORTER_PLUGIN_FILENAME
+    CORRADE_INTERNAL_ASSERT(_manager.load(ANYIMAGEIMPORTER_PLUGIN_FILENAME) & PluginManager::LoadState::Loaded);
+    #endif
+    #ifdef TGAIMPORTER_PLUGIN_FILENAME
+    CORRADE_INTERNAL_ASSERT(_manager.load(TGAIMPORTER_PLUGIN_FILENAME) & PluginManager::LoadState::Loaded);
+    #endif
 }
 
-void VertexColorGLTest::construct2D() {
+template<UnsignedInt dimensions> void VertexColorGLTest::construct() {
+    setTestCaseTemplateName(std::to_string(dimensions));
+
+    VertexColor<dimensions> shader;
+    CORRADE_VERIFY(shader.id());
+    {
+        #ifdef CORRADE_TARGET_APPLE
+        CORRADE_EXPECT_FAIL("macOS drivers need insane amount of state to validate properly.");
+        #endif
+        CORRADE_VERIFY(shader.validate().first);
+    }
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+}
+
+template<UnsignedInt dimensions> void VertexColorGLTest::constructMove() {
+    setTestCaseTemplateName(std::to_string(dimensions));
+
+    VertexColor<dimensions> a;
+    const GLuint id = a.id();
+    CORRADE_VERIFY(id);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    VertexColor<dimensions> b{std::move(a)};
+    CORRADE_COMPARE(b.id(), id);
+    CORRADE_VERIFY(!a.id());
+
+    VertexColor<dimensions> c{NoCreate};
+    c = std::move(b);
+    CORRADE_COMPARE(c.id(), id);
+    CORRADE_VERIFY(!b.id());
+}
+
+constexpr Vector2i RenderSize{80, 80};
+
+void VertexColorGLTest::renderSetup() {
+    /* Pick a color that's directly representable on RGBA4 as well to reduce
+       artifacts */
+    GL::Renderer::setClearColor(0x111111_rgbf);
+    GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
+
+    _color = GL::Renderbuffer{};
+    _color.setStorage(
+        #if !defined(MAGNUM_TARGET_GLES2) || !defined(MAGNUM_TARGET_WEBGL)
+        GL::RenderbufferFormat::RGBA8,
+        #else
+        GL::RenderbufferFormat::RGBA4,
+        #endif
+        RenderSize);
+    _framebuffer = GL::Framebuffer{{{}, RenderSize}};
+    _framebuffer.attachRenderbuffer(GL::Framebuffer::ColorAttachment{0}, _color)
+        .clear(GL::FramebufferClear::Color)
+        .bind();
+}
+
+void VertexColorGLTest::renderTeardown() {
+    _framebuffer = GL::Framebuffer{NoCreate};
+    _color = GL::Renderbuffer{NoCreate};
+}
+
+template<class T> void VertexColorGLTest::renderDefaults2D() {
+    setTestCaseTemplateName(T::Size == 3 ? "Color3" : "Color4");
+
+    Trade::MeshData2D circleData = Primitives::circle2DSolid(32,
+        Primitives::CircleTextureCoords::Generate);
+
+    /* All a single color */
+    Containers::Array<T> colorData{Containers::DirectInit, circleData.positions(0).size(), 0xffffff_rgbf};
+
+    GL::Buffer colors;
+    colors.setData(colorData);
+    GL::Mesh circle = MeshTools::compile(circleData);
+    circle.addVertexBuffer(colors, 0, GL::Attribute<Shaders::VertexColor2D::Color3::Location, T>{});
+
     VertexColor2D shader;
-    {
-        #ifdef CORRADE_TARGET_APPLE
-        CORRADE_EXPECT_FAIL("macOS drivers need insane amount of state to validate properly.");
-        #endif
-        CORRADE_VERIFY(shader.id());
-        CORRADE_VERIFY(shader.validate().first);
-    }
+    circle.draw(shader);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    if(!(_manager.loadState("AnyImageImporter") & PluginManager::LoadState::Loaded) ||
+       !(_manager.loadState("TgaImporter") & PluginManager::LoadState::Loaded))
+        CORRADE_SKIP("AnyImageImporter / TgaImageImporter plugins not found.");
+
+    #if !(defined(MAGNUM_TARGET_GLES2) && defined(MAGNUM_TARGET_WEBGL))
+    /* SwiftShader has differently rasterized edges on eight pixels */
+    const Float maxThreshold = 238.0f, meanThreshold = 0.298f;
+    #else
+    /* WebGL 1 doesn't have 8bit renderbuffer storage, so it's way worse */
+    const Float maxThreshold = 238.0f, meanThreshold = 0.298f;
+    #endif
+    CORRADE_COMPARE_WITH(
+        /* Dropping the alpha channel, as it's always 1.0 */
+        Containers::arrayCast<Color3ub>(_framebuffer.read(_framebuffer.viewport(), {PixelFormat::RGBA8Unorm}).pixels<Color4ub>()),
+        Utility::Directory::join(SHADERS_TEST_DIR, "FlatTestFiles/defaults.tga"),
+        (DebugTools::CompareImageToFile{_manager, maxThreshold, meanThreshold}));
 }
 
-void VertexColorGLTest::construct3D() {
+template<class T> void VertexColorGLTest::renderDefaults3D() {
+    setTestCaseTemplateName(T::Size == 3 ? "Color3" : "Color4");
+
+    if(!(_manager.loadState("AnyImageImporter") & PluginManager::LoadState::Loaded) ||
+       !(_manager.loadState("TgaImporter") & PluginManager::LoadState::Loaded))
+        CORRADE_SKIP("AnyImageImporter / TgaImageImporter plugins not found.");
+
+    Trade::MeshData3D sphereData = Primitives::uvSphereSolid(16, 32,
+        Primitives::UVSphereTextureCoords::Generate);
+
+    /* All a single color */
+    Containers::Array<T> colorData{Containers::DirectInit, sphereData.positions(0).size(), 0xffffff_rgbf};
+
+    GL::Buffer colors;
+    colors.setData(colorData);
+    GL::Mesh sphere = MeshTools::compile(sphereData);
+    sphere.addVertexBuffer(colors, 0, GL::Attribute<Shaders::VertexColor2D::Color4::Location, T>{});
+
     VertexColor3D shader;
-    {
-        #ifdef CORRADE_TARGET_APPLE
-        CORRADE_EXPECT_FAIL("macOS drivers need insane amount of state to validate properly.");
-        #endif
-        CORRADE_VERIFY(shader.id());
-        CORRADE_VERIFY(shader.validate().first);
-    }
-}
-
-void VertexColorGLTest::constructMove2D() {
-    VertexColor2D a;
-    const GLuint id = a.id();
-    CORRADE_VERIFY(id);
+    sphere.draw(shader);
 
     MAGNUM_VERIFY_NO_GL_ERROR();
 
-    VertexColor2D b{std::move(a)};
-    CORRADE_COMPARE(b.id(), id);
-    CORRADE_VERIFY(!a.id());
-
-    VertexColor2D c{NoCreate};
-    c = std::move(b);
-    CORRADE_COMPARE(c.id(), id);
-    CORRADE_VERIFY(!b.id());
+    #if !(defined(MAGNUM_TARGET_GLES2) && defined(MAGNUM_TARGET_WEBGL))
+    /* SwiftShader has differently rasterized edges on eight pixels */
+    const Float maxThreshold = 238.0f, meanThreshold = 0.298f;
+    #else
+    /* WebGL 1 doesn't have 8bit renderbuffer storage, so it's way worse */
+    const Float maxThreshold = 238.0f, meanThreshold = 0.298f;
+    #endif
+    CORRADE_COMPARE_WITH(
+        /* Dropping the alpha channel, as it's always 1.0 */
+        Containers::arrayCast<Color3ub>(_framebuffer.read(_framebuffer.viewport(), {PixelFormat::RGBA8Unorm}).pixels<Color4ub>()),
+        Utility::Directory::join(SHADERS_TEST_DIR, "FlatTestFiles/defaults.tga"),
+        (DebugTools::CompareImageToFile{_manager, maxThreshold, meanThreshold}));
 }
 
-void VertexColorGLTest::constructMove3D() {
-    VertexColor3D a;
-    const GLuint id = a.id();
-    CORRADE_VERIFY(id);
+template<class T> void VertexColorGLTest::render2D() {
+    setTestCaseTemplateName(T::Size == 3 ? "Color3" : "Color4");
+
+    Trade::MeshData2D circleData = Primitives::circle2DSolid(32,
+        Primitives::CircleTextureCoords::Generate);
+
+    /* Highlight a quarter */
+    Containers::Array<T> colorData{Containers::DirectInit, circleData.positions(0).size(), 0x9999ff_rgbf};
+    for(std::size_t i = 8; i != 16; ++i)
+        colorData[i + 1] = 0xffff99_rgbf;
+
+    GL::Buffer colors;
+    colors.setData(colorData);
+    GL::Mesh circle = MeshTools::compile(circleData);
+    circle.addVertexBuffer(colors, 0, GL::Attribute<Shaders::VertexColor2D::Color3::Location, T>{});
+
+    VertexColor2D shader;
+    shader.setTransformationProjectionMatrix(Matrix3::projection({2.1f, 2.1f}));
+    circle.draw(shader);
 
     MAGNUM_VERIFY_NO_GL_ERROR();
 
-    VertexColor3D b{std::move(a)};
-    CORRADE_COMPARE(b.id(), id);
-    CORRADE_VERIFY(!a.id());
+    if(!(_manager.loadState("AnyImageImporter") & PluginManager::LoadState::Loaded) ||
+       !(_manager.loadState("TgaImporter") & PluginManager::LoadState::Loaded))
+        CORRADE_SKIP("AnyImageImporter / TgaImageImporter plugins not found.");
 
-    VertexColor3D c{NoCreate};
-    c = std::move(b);
-    CORRADE_COMPARE(c.id(), id);
-    CORRADE_VERIFY(!b.id());
+    #if !(defined(MAGNUM_TARGET_GLES2) && defined(MAGNUM_TARGET_WEBGL))
+    /* AMD has minor rounding differences in the gradient compared to Intel,
+       SwiftShader as well */
+    const Float maxThreshold = 1.0f, meanThreshold = 0.667f;
+    #else
+    /* WebGL 1 doesn't have 8bit renderbuffer storage, so it's way worse */
+    const Float maxThreshold = 11.34f, meanThreshold = 1.479f;
+    #endif
+    CORRADE_COMPARE_WITH(
+        /* Dropping the alpha channel, as it's always 1.0 */
+        Containers::arrayCast<Color3ub>(_framebuffer.read(_framebuffer.viewport(), {PixelFormat::RGBA8Unorm}).pixels<Color4ub>()),
+        Utility::Directory::join(SHADERS_TEST_DIR, "VertexColorTestFiles/vertexColor2D.tga"),
+        (DebugTools::CompareImageToFile{_manager, maxThreshold, meanThreshold}));
+}
+
+template<class T> void VertexColorGLTest::render3D() {
+    setTestCaseTemplateName(T::Size == 3 ? "Color3" : "Color4");
+
+    if(!(_manager.loadState("AnyImageImporter") & PluginManager::LoadState::Loaded) ||
+       !(_manager.loadState("TgaImporter") & PluginManager::LoadState::Loaded))
+        CORRADE_SKIP("AnyImageImporter / TgaImageImporter plugins not found.");
+
+    Trade::MeshData3D sphereData = Primitives::uvSphereSolid(16, 32,
+        Primitives::UVSphereTextureCoords::Generate);
+
+    /* Highlight the middle rings */
+    Containers::Array<T> colorData{Containers::DirectInit, sphereData.positions(0).size(), 0x9999ff_rgbf};
+    for(std::size_t i = 6*33; i != 9*33; ++i)
+        colorData[i + 1] = 0xffff99_rgbf;
+
+    GL::Buffer colors;
+    colors.setData(colorData);
+    GL::Mesh sphere = MeshTools::compile(sphereData);
+    sphere.addVertexBuffer(colors, 0, GL::Attribute<Shaders::VertexColor2D::Color4::Location, T>{});
+
+    VertexColor3D shader;
+    shader.setTransformationProjectionMatrix(
+            Matrix4::perspectiveProjection(60.0_degf, 1.0f, 0.1f, 10.0f)*
+            Matrix4::translation(Vector3::zAxis(-2.15f))*
+            Matrix4::rotationY(-15.0_degf)*
+            Matrix4::rotationX(15.0_degf));
+    sphere.draw(shader);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+
+    #if !(defined(MAGNUM_TARGET_GLES2) && defined(MAGNUM_TARGET_WEBGL))
+    /* AMD has one different pixel compared to Intel, SwiftShader has
+       differently rasterized edges on five pixels */
+    const Float maxThreshold = 204.0f, meanThreshold = 0.158f;
+    #else
+    /* WebGL 1 doesn't have 8bit renderbuffer storage, so it's way worse */
+    const Float maxThreshold = 204.0f, meanThreshold = 1.284f;
+    #endif
+    CORRADE_COMPARE_WITH(
+        /* Dropping the alpha channel, as it's always 1.0 */
+        Containers::arrayCast<Color3ub>(_framebuffer.read(_framebuffer.viewport(), {PixelFormat::RGBA8Unorm}).pixels<Color4ub>()),
+        Utility::Directory::join(SHADERS_TEST_DIR, "VertexColorTestFiles/vertexColor3D.tga"),
+        (DebugTools::CompareImageToFile{_manager, maxThreshold, meanThreshold}));
 }
 
 }}}}

@@ -33,7 +33,13 @@ namespace Magnum { namespace Platform { namespace Test { namespace {
 
 struct Sdl2ApplicationTest: Platform::Application {
     /* For testing resize events */
-    explicit Sdl2ApplicationTest(const Arguments& arguments): Platform::Application{arguments, Configuration{}.setWindowFlags(Configuration::WindowFlag::Resizable)} {}
+    explicit Sdl2ApplicationTest(const Arguments& arguments): Platform::Application{arguments, Configuration{}.setWindowFlags(Configuration::WindowFlag::Resizable)} {
+        Debug{} << "window size" << windowSize()
+            #ifdef MAGNUM_TARGET_GL
+            << framebufferSize()
+            #endif
+            << dpiScaling();
+    }
 
     void exitEvent(ExitEvent& event) override {
         Debug{} << "application exiting";
@@ -53,7 +59,19 @@ struct Sdl2ApplicationTest: Platform::Application {
 
     /* For testing event coordinates */
     void mousePressEvent(MouseEvent& event) override {
-        Debug{} << "mouse press event:" << event.position();
+        Debug{} << "mouse press event:" << event.position() << Int(event.button());
+    }
+
+    void mouseReleaseEvent(MouseEvent& event) override {
+        Debug{} << "mouse release event:" << event.position() << Int(event.button());
+    }
+
+    void mouseMoveEvent(MouseMoveEvent& event) override {
+        Debug{} << "mouse move event:" << event.position() << event.relativePosition() << Uint32(event.buttons());
+    }
+
+    void mouseScrollEvent(MouseScrollEvent& event) override {
+        Debug{} << "mouse scroll event:" << event.offset() << event.position();
     }
 
     void keyPressEvent(KeyEvent& event) override {
@@ -65,6 +83,9 @@ struct Sdl2ApplicationTest: Platform::Application {
         } else if(event.key() == KeyEvent::Key::Esc) {
             Debug{} << "stopping text input";
             stopTextInput();
+        } else if(event.key() == KeyEvent::Key::T) {
+            Debug{} << "setting window title";
+            setWindowTitle("This is a UTF-8 Window Title™!");
         }
         #ifdef CORRADE_TARGET_EMSCRIPTEN
         else if(event.key() == KeyEvent::Key::F) {

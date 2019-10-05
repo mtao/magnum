@@ -466,7 +466,7 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
 
         #ifndef MAGNUM_TARGET_GLES
         /**
-         * @brief @copybrief Texture::image(Int, Image&)
+         * @brief Read given texture mip level to an image
          *
          * See @ref Texture::image(Int, Image&) for more information.
          * @requires_gl Texture image queries are not available in OpenGL ES.
@@ -486,7 +486,18 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         Image3D image(Int level, Image3D&& image);
 
         /**
-         * @brief @copybrief Texture::image(Int, BufferImage&, BufferUsage)
+         * @brief Read given texture mip level to an image view
+         *
+         * Compared to @ref image(Int, Image3D&) the function reads the pixels
+         * into the memory provided by @p image, expecting it's not
+         * @cpp nullptr @ce and its size is the same as size of given @p level.
+         */
+        void image(Int level, const MutableImageView3D& image) {
+            AbstractTexture::image<3>(level, image);
+        }
+
+        /**
+         * @brief Read given texture mip level to a buffer image
          *
          * See @ref Texture::image(Int, BufferImage&, BufferUsage) for more
          * information.
@@ -507,7 +518,7 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         BufferImage3D image(Int level, BufferImage3D&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::compressedImage(Int, CompressedImage&)
+         * @brief Read given compressed texture mip level to an image
          *
          * See @ref Texture::compressedImage(Int, CompressedImage&) for more
          *      information.
@@ -530,7 +541,19 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         CompressedImage3D compressedImage(Int level, CompressedImage3D&& image);
 
         /**
-         * @brief @copybrief Texture::compressedImage(Int, CompressedBufferImage&, BufferUsage)
+         * @brief Read given compressed texture mip level to an image view
+         *
+         * Compared to @ref compressedImage(Int, CompressedImage3D&) the
+         * function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as size of given @p level.
+         */
+        void compressedImage(Int level, const MutableCompressedImageView3D& image) {
+            AbstractTexture::compressedImage<3>(level, image);
+        }
+
+        /**
+         * @brief Read given compressed texture mip level to a buffer image
          *
          * See @ref Texture::compressedImage(Int, CompressedBufferImage&, BufferUsage)
          * for more information.
@@ -553,7 +576,7 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         CompressedBufferImage3D compressedImage(Int level, CompressedBufferImage3D&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, Image&)
+         * @brief Read a range of given texture mip level to an image
          *
          * See @ref Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, Image&)
          * for more information.
@@ -575,7 +598,19 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         Image3D subImage(Int level, const Range3Di& range, Image3D&& image);
 
         /**
-         * @brief @copybrief Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, BufferImage&, BufferUsage)
+         * @brief Read a range of given texture mip level to an image view
+         *
+         * Compared to @ref subImage(Int, const Range3Di&, Image3D&) the
+         * function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce and its size is the same as
+         * @p range size.
+         */
+        void subImage(Int level, const Range3Di& range, const MutableImageView3D& image) {
+            AbstractTexture::subImage<3>(level, range, image);
+        }
+
+        /**
+         * @brief Read a range of given texture mip level to a buffer image
          *
          * See @ref Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, BufferImage&, BufferUsage)
          * for more information.
@@ -597,7 +632,7 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         BufferImage3D subImage(Int level, const Range3Di& range, BufferImage3D&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage&)
+         * @brief Read a range of given compressed texture mip level to an image
          *
          * See @ref Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage&)
          * for more information.
@@ -625,7 +660,19 @@ class MAGNUM_GL_EXPORT CubeMapTextureArray: public AbstractTexture {
         CompressedImage3D compressedSubImage(Int level, const Range3Di& range, CompressedImage3D&& image);
 
         /**
-         * @brief @copybrief Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedBufferImage&, BufferUsage)
+         * @brief Read a range of given compressed texture mip level to an image view
+         *
+         * Compared to @ref compressedSubImage(Int, const Range3Di&, CompressedImage3D&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as @p range size.
+         */
+        void compressedSubImage(Int level, const Range3Di& range, const MutableCompressedImageView3D& image) {
+            AbstractTexture::compressedSubImage<3>(level, range, image);
+        }
+
+        /**
+         * @brief Read a range of given compressed texture mip level to a buffer image
          *
          * See @ref Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedBufferImage&, BufferUsage)
          * for more information.

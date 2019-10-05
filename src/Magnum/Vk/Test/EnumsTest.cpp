@@ -181,8 +181,8 @@ void EnumsTest::mapVkFormat() {
     /* This goes through the first 16 bits, which should be enough. Going
        through 32 bits takes 8 seconds, too much. */
     UnsignedInt firstUnhandled = 0xffff;
-    UnsignedInt nextHandled = 0;
-    for(UnsignedInt i = 0; i <= 0xffff; ++i) {
+    UnsignedInt nextHandled = 1; /* 0 is an invalid format */
+    for(UnsignedInt i = 1; i <= 0xffff; ++i) {
         const auto format = Magnum::PixelFormat(i);
         /* Each case verifies:
            - that the cases are ordered by number (so insertion here is done in
@@ -190,6 +190,10 @@ void EnumsTest::mapVkFormat() {
            - that there was no gap (unhandled value inside the range)
            - that a particular pixel format maps to a particular GL format
            - that a particular pixel type maps to a particular GL type */
+        #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic error "-Wswitch"
+        #endif
         switch(format) {
             #define _c(format, expectedFormat) \
                 case Magnum::PixelFormat::format: \
@@ -211,6 +215,9 @@ void EnumsTest::mapVkFormat() {
             #undef _s
             #undef _c
         }
+        #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+        #endif
 
         /* Not handled by any value, remember -- we might either be at the end
            of the enum range (which is okay) or some value might be unhandled
@@ -243,10 +250,14 @@ void EnumsTest::mapVkFormatInvalid() {
     std::ostringstream out;
     Error redirectError{&out};
 
+    hasVkFormat(Magnum::PixelFormat{});
     hasVkFormat(Magnum::PixelFormat(0x123));
+    vkFormat(Magnum::PixelFormat{});
     vkFormat(Magnum::PixelFormat(0x123));
     CORRADE_COMPARE(out.str(),
+        "Vk::hasVkFormat(): invalid format PixelFormat(0x0)\n"
         "Vk::hasVkFormat(): invalid format PixelFormat(0x123)\n"
+        "Vk::vkFormat(): invalid format PixelFormat(0x0)\n"
         "Vk::vkFormat(): invalid format PixelFormat(0x123)\n");
 }
 
@@ -258,8 +269,8 @@ void EnumsTest::mapVkFormatCompressed() {
     /* This goes through the first 16 bits, which should be enough. Going
        through 32 bits takes 8 seconds, too much. */
     UnsignedInt firstUnhandled = 0xffff;
-    UnsignedInt nextHandled = 0;
-    for(UnsignedInt i = 0; i <= 0xffff; ++i) {
+    UnsignedInt nextHandled = 1; /* 0 is an invalid format */
+    for(UnsignedInt i = 1; i <= 0xffff; ++i) {
         const auto format = Magnum::CompressedPixelFormat(i);
         /* Each case verifies:
            - that the cases are ordered by number (so insertion here is done in
@@ -267,6 +278,10 @@ void EnumsTest::mapVkFormatCompressed() {
            - that there was no gap (unhandled value inside the range)
            - that a particular pixel format maps to a particular GL format
            - that a particular pixel type maps to a particular GL type */
+        #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic error "-Wswitch"
+        #endif
         switch(format) {
             #define _c(format, expectedFormat) \
                 case Magnum::CompressedPixelFormat::format: \
@@ -288,6 +303,9 @@ void EnumsTest::mapVkFormatCompressed() {
             #undef _s
             #undef _c
         }
+        #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+        #endif
 
         /* Not handled by any value, remember -- we might either be at the end
            of the enum range (which is okay) or some value might be unhandled
@@ -305,26 +323,26 @@ void EnumsTest::mapVkFormatCompressedImplementationSpecific() {
 }
 
 void EnumsTest::mapVkFormatCompressedUnsupported() {
-    #if 1
-    CORRADE_SKIP("All compressed pixel formats are currently supported.");
-    #else
-    CORRADE_VERIFY(!hasVkFormat(Magnum::CompressedPixelFormat::Bc1RGBAUnorm));
+    CORRADE_VERIFY(!hasVkFormat(Magnum::CompressedPixelFormat::Astc3x3x3RGBAUnorm));
 
     std::ostringstream out;
     Error redirectError{&out};
-    vkFormat(Magnum::CompressedPixelFormat::Bc1RGBAUnorm);
-    CORRADE_COMPARE(out.str(), "Vk::vkFormat(): unsupported format CompressedPixelFormat::Bc1RGBAUnorm\n");
-    #endif
+    vkFormat(Magnum::CompressedPixelFormat::Astc3x3x3RGBAUnorm);
+    CORRADE_COMPARE(out.str(), "Vk::vkFormat(): unsupported format CompressedPixelFormat::Astc3x3x3RGBAUnorm\n");
 }
 
 void EnumsTest::mapVkFormatCompressedInvalid() {
     std::ostringstream out;
     Error redirectError{&out};
 
+    hasVkFormat(Magnum::CompressedPixelFormat{});
     hasVkFormat(Magnum::CompressedPixelFormat(0x123));
+    vkFormat(Magnum::CompressedPixelFormat{});
     vkFormat(Magnum::CompressedPixelFormat(0x123));
     CORRADE_COMPARE(out.str(),
+        "Vk::hasVkFormat(): invalid format CompressedPixelFormat(0x0)\n"
         "Vk::hasVkFormat(): invalid format CompressedPixelFormat(0x123)\n"
+        "Vk::vkFormat(): invalid format CompressedPixelFormat(0x0)\n"
         "Vk::vkFormat(): invalid format CompressedPixelFormat(0x123)\n");
 }
 

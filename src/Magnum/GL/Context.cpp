@@ -90,15 +90,18 @@ constexpr Extension ExtensionList[]{
     _extension(EXT,texture_filter_anisotropic),
     _extension(EXT,texture_compression_s3tc),
     _extension(EXT,texture_mirror_clamp),
+    _extension(EXT,texture_compression_dxt1),
     _extension(EXT,texture_sRGB_decode),
     _extension(EXT,shader_integer_mix),
     _extension(EXT,debug_label),
     _extension(EXT,debug_marker),
+    _extension(EXT,texture_sRGB_R8),
     _extension(GREMEDY,string_marker),
     _extension(KHR,texture_compression_astc_ldr),
     _extension(KHR,texture_compression_astc_hdr),
     _extension(KHR,blend_equation_advanced),
-    _extension(KHR,blend_equation_advanced_coherent)};
+    _extension(KHR,blend_equation_advanced_coherent),
+    _extension(KHR,texture_compression_astc_sliced_3d)};
 constexpr Extension ExtensionList300[]{
     _extension(ARB,map_buffer_range),
     _extension(ARB,color_buffer_float),
@@ -245,9 +248,16 @@ constexpr Extension ExtensionList460[]{
 constexpr Extension ExtensionList[]{
     _extension(EXT,texture_filter_anisotropic),
     _extension(EXT,disjoint_timer_query),
+    #ifndef MAGNUM_TARGET_GLES2
     _extension(EXT,color_buffer_float),
+    #endif
+    _extension(EXT,texture_compression_rgtc),
+    _extension(EXT,texture_compression_bptc),
     _extension(OES,texture_float_linear),
-    _extension(WEBGL,compressed_texture_s3tc)};
+    _extension(WEBGL,compressed_texture_s3tc),
+    _extension(WEBGL,compressed_texture_pvrtc),
+    _extension(WEBGL,compressed_texture_astc),
+    _extension(WEBGL,compressed_texture_s3tc_srgb)};
 constexpr Extension ExtensionListES300[]{
     #ifdef MAGNUM_TARGET_GLES2
     _extension(ANGLE,instanced_arrays),
@@ -256,7 +266,9 @@ constexpr Extension ExtensionListES300[]{
     _extension(EXT,blend_minmax),
     _extension(EXT,shader_texture_lod),
     #endif
+    #ifndef MAGNUM_TARGET_GLES2
     _extension(MAGNUM,shader_vertex_id),
+    #endif
     #ifdef MAGNUM_TARGET_GLES2
     _extension(OES,texture_float),
     _extension(OES,texture_half_float),
@@ -275,10 +287,14 @@ constexpr Extension ExtensionList[]{
     #ifndef MAGNUM_TARGET_GLES2
     _extension(ANDROID,extension_pack_es31a),
     #endif
+    _extension(ANGLE,texture_compression_dxt1),
+    _extension(ANGLE,texture_compression_dxt3),
+    _extension(ANGLE,texture_compression_dxt5),
     _extension(APPLE,texture_format_BGRA8888),
     _extension(ARM,shader_framebuffer_fetch),
     _extension(ARM,shader_framebuffer_fetch_depth_stencil),
     _extension(EXT,texture_filter_anisotropic),
+    _extension(EXT,texture_compression_dxt1),
     _extension(EXT,texture_format_BGRA8888),
     _extension(EXT,read_format_bgra),
     _extension(EXT,multi_draw_arrays),
@@ -292,14 +308,20 @@ constexpr Extension ExtensionList[]{
     _extension(EXT,texture_sRGB_decode),
     _extension(EXT,sRGB_write_control),
     _extension(EXT,texture_compression_s3tc),
+    _extension(EXT,pvrtc_sRGB),
     #ifndef MAGNUM_TARGET_GLES2
     _extension(EXT,shader_integer_mix),
+    _extension(EXT,texture_sRGB_R8),
+    _extension(EXT,texture_sRGB_RG8),
     #endif
     _extension(EXT,polygon_offset_clamp),
+    _extension(EXT,texture_compression_s3tc_srgb),
+    _extension(IMG,texture_compression_pvrtc),
     _extension(KHR,texture_compression_astc_hdr),
     _extension(KHR,blend_equation_advanced_coherent),
     _extension(KHR,context_flush_control),
     _extension(KHR,no_error),
+    _extension(KHR,texture_compression_astc_sliced_3d),
     _extension(NV,read_buffer_front),
     _extension(NV,read_depth),
     _extension(NV,read_stencil),
@@ -313,7 +335,11 @@ constexpr Extension ExtensionList[]{
     _extension(OES,mapbuffer),
     _extension(OES,stencil1),
     _extension(OES,stencil4),
-    _extension(OES,texture_float_linear)};
+    _extension(OES,texture_float_linear),
+    #ifndef MAGNUM_TARGET_GLES2
+    _extension(OES,texture_compression_astc)
+    #endif
+    };
 constexpr Extension ExtensionListES300[]{
     #ifdef MAGNUM_TARGET_GLES2
     _extension(ANGLE,framebuffer_blit),
@@ -338,7 +364,9 @@ constexpr Extension ExtensionListES300[]{
     _extension(EXT,instanced_arrays),
     _extension(EXT,draw_instanced),
     #endif
+    #ifndef MAGNUM_TARGET_GLES2
     _extension(MAGNUM,shader_vertex_id),
+    #endif
     #ifdef MAGNUM_TARGET_GLES2
     _extension(NV,draw_buffers),
     _extension(NV,fbo_color_attachments),
@@ -442,16 +470,32 @@ Containers::ArrayView<const Extension> Extension::extensions(Version version) {
     CORRADE_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
 }
 
+#ifndef MAGNUM_BUILD_STATIC
+/* (Of course) can't be in an unnamed namespace in order to export it below */
 namespace {
-    #ifdef MAGNUM_BUILD_MULTITHREADED
-    #ifndef CORRADE_TARGET_APPLE
-    thread_local
+#endif
+
+#ifdef CORRADE_BUILD_MULTITHREADED
+CORRADE_THREAD_LOCAL
+#endif
+#if defined(MAGNUM_BUILD_STATIC) && !defined(CORRADE_TARGET_WINDOWS)
+/* On static builds that get linked to multiple shared libraries and then used
+   in a single app we want to ensure there's just one global symbol. On Linux
+   it's apparently enough to just export, macOS needs the weak attribute.
+   Windows not handled yet, as it needs a workaround using DllMain() and
+   GetProcAddress(). */
+CORRADE_VISIBILITY_EXPORT
+    #ifdef __GNUC__
+    __attribute__((weak))
     #else
-    __thread
+    /* uh oh? the test will fail, probably */
     #endif
-    #endif
-    Context* currentContext = nullptr;
+#endif
+Context* currentContext = nullptr;
+
+#ifndef MAGNUM_BUILD_STATIC
 }
+#endif
 
 bool Context::hasCurrent() { return currentContext; }
 
@@ -460,6 +504,8 @@ Context& Context::current() {
     return *currentContext;
 }
 
+void Context::makeCurrent(Context* context) { currentContext = context; }
+
 Context::Context(NoCreateT, Int argc, const char** argv, void functionLoader(Context&)): Context{NoCreate, Utility::Arguments{"magnum"}, argc, argv, functionLoader} {}
 
 Context::Context(NoCreateT, Utility::Arguments& args, Int argc, const char** argv, void functionLoader(Context&)): _functionLoader{functionLoader}, _version{Version::None} {
@@ -467,7 +513,7 @@ Context::Context(NoCreateT, Utility::Arguments& args, Int argc, const char** arg
     CORRADE_INTERNAL_ASSERT(args.prefix() == "magnum");
     args.addOption("disable-workarounds")
         .setHelp("disable-workarounds", "driver workarounds to disable\n      (see https://doc.magnum.graphics/magnum/opengl-workarounds.html for detailed info)", "LIST")
-        .addOption("disable-extensions").setHelp("disable-extensions", "OpenGL extensions to disable", "LIST")
+        .addOption("disable-extensions").setHelp("disable-extensions", "API extensions to disable", "LIST")
         .addOption("gpu-validation", "off").setHelp("gpu-validation", "GPU validation using KHR_debug (if present)", "off|on")
         .addOption("log", "default").setHelp("log", "console logging", "default|quiet|verbose")
         .setFromEnvironment("disable-workarounds")
@@ -476,8 +522,10 @@ Context::Context(NoCreateT, Utility::Arguments& args, Int argc, const char** arg
         .setFromEnvironment("log")
         .parse(argc, argv);
 
-    /* Decide whether to display initialization log */
-    if(!(args.value("log") == "quiet" || args.value("log") == "QUIET"))
+    /* Decide how to display initialization log */
+    if(args.value("log") == "verbose" || args.value("log") == "VERBOSE")
+        _internalFlags |= InternalFlag::DisplayVerboseInitializationLog;
+    else if(!(args.value("log") == "quiet" || args.value("log") == "QUIET"))
         _internalFlags |= InternalFlag::DisplayInitializationLog;
 
     /* Decide whether to enable GPU validation */
@@ -707,13 +755,13 @@ bool Context::tryCreate() {
     std::ostream* output = _internalFlags & InternalFlag::DisplayInitializationLog ? Debug::output() : nullptr;
 
     /* Print some info and initialize state tracker (which also prints some
-       more info) */
-    Debug{output} << "Renderer:" << rendererString() << "by" << vendorString();
+       more info). Mesa's renderer string has a space at the end, trim that. */
+    Debug{output} << "Renderer:" << Utility::String::trim(rendererString()) << "by" << vendorString();
     Debug{output} << "OpenGL version:" << versionString();
 
     /* Disable extensions as requested by the user */
     if(!_disabledExtensions.empty()) {
-        Debug{output} << "Disabling extensions:";
+        bool headerPrinted = false;
 
         /* Put remaining extensions into the hashmap for faster lookup */
         std::unordered_map<std::string, Extension> allExtensions{std::move(futureExtensions)};
@@ -725,10 +773,16 @@ bool Context::tryCreate() {
            for each */
         for(auto&& extension: _disabledExtensions) {
             auto found = allExtensions.find(extension);
-            /** @todo Error message here? I should not clutter the output at this point */
+            /* No error message here because some of the extensions could be
+               from Vulkan or OpenAL. That also means we print the header only
+               when we actually have something to say */
             if(found == allExtensions.end()) continue;
 
             _extensionRequiredVersion[found->second.index()] = Version::None;
+            if(!headerPrinted) {
+                Debug{output} << "Disabling extensions:";
+                headerPrinted = true;
+            }
             Debug{output} << "   " << extension;
         }
     }
@@ -750,10 +804,17 @@ bool Context::tryCreate() {
     /* Enable GPU validation, if requested */
     if(_internalFlags & InternalFlag::GpuValidation) {
         #ifndef MAGNUM_TARGET_WEBGL
-        if(Context::current().isExtensionSupported<Extensions::KHR::debug>()) {
+        if(isExtensionSupported<Extensions::KHR::debug>()) {
             Renderer::enable(Renderer::Feature::DebugOutput);
             Renderer::enable(Renderer::Feature::DebugOutputSynchronous);
             DebugOutput::setDefaultCallback();
+
+            if((detectedDriver() & DetectedDriver::Amd) && !(flags() & Flag::Debug)) {
+                Warning{} << "GL::Context: GPU validation on AMD drivers requires debug context to work properly";
+            } else if(_internalFlags >= InternalFlag::DisplayVerboseInitializationLog) {
+                Debug{} << "GL::Context: enabling GPU validation";
+            }
+
         } else Warning{} << "GL::Context: GPU validation requested, but GL_KHR_debug not supported";
         #else
         Warning{} << "GL::Context: GPU validation is not available on WebGL";

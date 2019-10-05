@@ -36,18 +36,23 @@ Magnum uses CMake as a primary build system for both building and integration
 into your projects. The following guide explains how to use it. If you wish to
 use a different buildsystem, see @ref custom-buildsystems instead.
 
-The main logic is in the `FindMagnum.cmake` module distributed with the engine
-in the `modules/` directory, you are encouraged to copy it along with
-`FindCorrade.cmake` into your project and add path to the files to
-`CMAKE_MODULE_PATH`. Otherwise, if CMake won't be able to find this file in
-predefined locations, it will error out even if Magnum might be installed on
-the system. If you plan to use Magnum on OpenGL ES, you may also need
-`FindOpenGLES2.cmake` or `FindOpenGLES3.cmake` and in some cases also
-`FindEGL.cmake`.
+The main logic is in the [FindMagnum.cmake](https://github.com/mosra/magnum/blob/master/modules/FindMagnum.cmake)
+module distributed with the engine in the `modules/` directory, you are
+encouraged to copy it along with [FindCorrade.cmake](https://github.com/mosra/corrade/blob/master/modules/FindCorrade.cmake)
+into your project and add path to the files to `CMAKE_MODULE_PATH`:
 
-Note that the module files are updated as the library evolves, you are
-encouraged to update your copies from time to time to avoid strange building
-issues.
+@code{.cmake}
+# Path where FindCorrade.cmake & FindMagnum.cmake can be found, adapt as needed
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
+@endcode
+
+Otherwise, if CMake won't be able to find this file in predefined locations, it
+will error out even if Magnum might be installed on the system. There are other
+Find modules that you might need for particular features or platforms, see
+the @ref cmake-modules "full list below". Each library that needs one of the
+extra modules also mentions the requirement in its documentation. Note that the
+module files are updated as the library evolves, you are encouraged to update
+your copies from time to time to avoid strange building issues.
 
 If you installed the library or its dependencies to non-standard location
 (other than `/usr`, e.g. `/home/xyz/projects`), set `CMAKE_PREFIX_PATH` to that
@@ -60,7 +65,8 @@ Basic usage is:
 find_package(Magnum REQUIRED)
 @endcode
 
-This module tries to find base Magnum library and then defines:
+This module tries to find the base Magnum library and then defines the
+following:
 
 -   `Magnum_FOUND` --- Whether the library was found
 -   `Magnum::Magnum` --- Base library imported target
@@ -78,10 +84,7 @@ This module tries to find base Magnum library and then defines:
     library was found
 -   `MAGNUM_PLUGINS_DIR` --- Base directory with dynamic plugins, defaults to
     `MAGNUM_PLUGINS_RELEASE_DIR` in release builds and multi-configuration
-    builds or to `MAGNUM_PLUGINS_DEBUG_DIR` in debug builds. You can modify all
-    three variable (e.g. set them to `.` when deploying on Windows with plugins
-    stored relatively to the executable), the following `MAGNUM_PLUGINS_*_DIR`
-    variables depend on it.
+    builds or to `MAGNUM_PLUGINS_DEBUG_DIR` in debug builds.
 -   `MAGNUM_PLUGINS_FONT[|_DEBUG|_RELEASE]_DIR` --- Directory with dynamic font
     plugins
 -   `MAGNUM_PLUGINS_FONTCONVERTER[|_DEBUG|_RELEASE]_DIR` --- Directory with
@@ -122,6 +125,8 @@ the components. The optional components are:
 
 Platform namespace is split into more components:
 
+-   `AndroidApplication` --- @ref Platform::AndroidApplication "AndroidApplication"
+-   `EmscriptenApplication` --- @ref Platform::EmscriptenApplication "EmscriptenApplication"
 -   `GlfwApplication` --- @ref Platform::GlfwApplication "GlfwApplication"
 -   `GlxApplication` --- @ref Platform::GlxApplication "GlxApplication"
 -   `Sdl2Application` --- @ref Platform::Sdl2Application "Sdl2Application"
@@ -214,7 +219,7 @@ release libraries). Note that this autodetection might fail for the
 `MAGNUM_PLUGINS_DIR` variable, especially on multi-configuration build systems.
 You can make use of @ref corrade-cmake "CORRADE_IS_DEBUG_BUILD" preprocessor
 variable along with `MAGNUM_PLUGINS_*_DEBUG_DIR` / `MAGNUM_PLUGINS_*_RELEASE_DIR`
-variables to decide in preprocessing step.
+variables to decide in preprocessing step instead.
 
 Features of found Magnum library are exposed in these CMake variables, they
 are also available as preprocessor variables if including
@@ -224,8 +229,6 @@ are also available as preprocessor variables if including
     included
 -   `MAGNUM_BUILD_STATIC` --- Defined if compiled as static libraries. Default
     are shared libraries.
--   `MAGNUM_BUILD_MULTITHREADED` --- Defined if compiled in a way that allows
-    having multiple thread-local Magnum contexts. The default.
 -   `MAGNUM_TARGET_GL` --- Defined if compiled with OpenGL interoperability
     enabled
 -   `MAGNUM_TARGET_GLES` --- Defined if compiled for OpenGL ES
@@ -239,6 +242,13 @@ are also available as preprocessor variables if including
 -   `MAGNUM_TARGET_VK` --- Defined if compiled with Vulkan interoperability
     enabled
 
+The following variables are provided for backwards compatibility purposes only
+when @ref MAGNUM_BUILD_DEPRECATED is defined and will be removed in a future
+release:
+
+-   `MAGNUM_BUILD_MULTITHREADED` --- Alias to `CORRADE_BUILD_MULTITHREADED`.
+    Use @ref CORRADE_BUILD_MULTITHREADED instead.
+
 Corrade library provides also its own set of CMake macros and variables, see
 @ref corrade-cmake "its documentation" for more information.
 @ref cmake-plugins "Plugins repository", @ref cmake-integration "Integration repository"
@@ -246,24 +256,33 @@ and @ref cmake-extras "Extras repository" have also their own CMake modules.
 
 @section cmake-modules Other CMake modules
 
-The `modules/` directory contains more useful CMake modules:
+The `modules/` directory of Magnum sources contains more useful CMake modules.
+If a library requires presence of any of these, it mentions them in its usage
+documentation.
 
--   `FindOpenAL.cmake` --- CMake module for finding OpenAL. This is a forked
-    version of the upstream module that works properly with
+-   [FindOpenAL.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenAL.cmake)
+    --- CMake module for finding OpenAL. This is a forked version of the
+    upstream module that works properly with
     @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten". Copy this to your module
     directory if you want to use the @ref Audio library on Emscripten.
--   `FindGLFW.cmake` --- CMake module for finding GLFW. Copy this to your module
-    directory if you want to use @ref Platform::GlfwApplication.
--   `FindEGL.cmake` --- CMake module for finding EGL. Copy this to your
-    module directory if you want to target embedded platforms such as
+-   [FindGLFW.cmake](https://github.com/mosra/magnum/blob/master/modules/FindGLFW.cmake)
+    --- CMake module for finding GLFW. Copy this to your module directory if
+    you want to use @ref Platform::GlfwApplication.
+-   [FindEGL.cmake](https://github.com/mosra/magnum/blob/master/modules/FindEGL.cmake)
+    --- CMake module for finding EGL. Copy this to your module directory if you
+    want to use the @ref GL library on embedded platforms such as
     @ref CORRADE_TARGET_IOS "iOS", @ref CORRADE_TARGET_ANDROID "Android",
     @ref CORRADE_TARGET_WINDOWS_RT "Windows RT" or
     @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" or if you want to use EGL
     instead of GLX/WGL/CGL on a desktop platform.
--   `FindOpenGLES2.cmake`, `FindOpenGLES3.cmake` --- CMake module for finding
-    OpenGL ES 2.0 / 3.0 library. Copy this to your module directory if you want
-    to target @ref MAGNUM_TARGET_GLES "OpenGL ES".
--   `FindSDL2.cmake` --- CMake module for finding SDL 2. Copy this to your
-    module directory if you want to use @ref Platform::Sdl2Application.
+-   [FindOpenGLES2.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenGLES2.cmake),
+    [FindOpenGLES3.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenGLES3.cmake)
+    --- CMake module for finding OpenGL ES 2.0 / 3.0 library. Copy this to your
+    module directory if you want to use the @ref GL library on
+    @ref MAGNUM_TARGET_GLES "OpenGL ES".
+-   [FindSDL2.cmake](https://github.com/mosra/magnum/blob/master/modules/FindSDL2.cmake)
+    --- CMake module for finding SDL 2. Copy this to your module directory if
+    you want to use @ref Platform::Sdl2Application.
+
 */
 }

@@ -56,6 +56,8 @@ namespace Magnum { namespace Platform {
 /**
 @brief Windowless GLX context
 
+@m_keywords{WindowlessGLContext}
+
 GL context using pure X11 and GLX, used in @ref WindowlessGlxApplication. Does
 not have any default framebuffer. It is built if `WITH_WINDOWLESSGLXAPPLICATION`
 is enabled in CMake.
@@ -152,7 +154,7 @@ class WindowlessGlxContext::Configuration {
         /**
          * @brief Context flag
          *
-         * @see @ref Flags, @ref setFlags(), @ref Context::Flag
+         * @see @ref Flags, @ref setFlags(), @ref GL::Context::Flag
          */
         enum class Flag: int {
             #ifndef MAGNUM_TARGET_GLES
@@ -165,7 +167,12 @@ class WindowlessGlxContext::Configuration {
             ForwardCompatible = GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
             #endif
 
-            Debug = GLX_CONTEXT_DEBUG_BIT_ARB   /**< Create debug context */
+            /**
+             * Debug context. Enabled automatically if the
+             * `--magnum-gpu-validation` @ref GL-Context-command-line "command-line option"
+             * is present.
+             */
+            Debug = GLX_CONTEXT_DEBUG_BIT_ARB
         };
 
         /**
@@ -235,6 +242,8 @@ CORRADE_ENUMSET_OPERATORS(WindowlessGlxContext::Configuration::Flags)
 
 /**
 @brief Windowless GLX application
+
+@m_keywords{WindowlessApplication}
 
 Application for offscreen rendering using @ref WindowlessGlxContext. This
 application library is available on desktop OpenGL and

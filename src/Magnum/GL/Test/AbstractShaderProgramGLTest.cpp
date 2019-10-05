@@ -30,6 +30,7 @@
 #include <Corrade/Utility/Resource.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/GL/AbstractShaderProgram.h"
 #include "Magnum/GL/Context.h"
 #include "Magnum/GL/Extensions.h"
@@ -577,6 +578,9 @@ MyDoubleShader::MyDoubleShader() {
 #endif
 
 void AbstractShaderProgramGLTest::uniformDouble() {
+    if(!Context::current().isExtensionSupported<Extensions::ARB::gpu_shader_fp64>())
+        CORRADE_SKIP(Extensions::ARB::gpu_shader_fp64::string() + std::string{" is not supported."});
+
     MyDoubleShader shader;
 
     MAGNUM_VERIFY_NO_GL_ERROR();
@@ -587,6 +591,9 @@ void AbstractShaderProgramGLTest::uniformDouble() {
 }
 
 void AbstractShaderProgramGLTest::uniformDoubleVector() {
+    if(!Context::current().isExtensionSupported<Extensions::ARB::gpu_shader_fp64>())
+        CORRADE_SKIP(Extensions::ARB::gpu_shader_fp64::string() + std::string{" is not supported."});
+
     MyDoubleShader shader;
 
     MAGNUM_VERIFY_NO_GL_ERROR();
@@ -597,6 +604,9 @@ void AbstractShaderProgramGLTest::uniformDoubleVector() {
 }
 
 void AbstractShaderProgramGLTest::uniformDoubleMatrix() {
+    if(!Context::current().isExtensionSupported<Extensions::ARB::gpu_shader_fp64>())
+        CORRADE_SKIP(Extensions::ARB::gpu_shader_fp64::string() + std::string{" is not supported."});
+
     MyDoubleShader shader;
 
     MAGNUM_VERIFY_NO_GL_ERROR();
@@ -607,6 +617,9 @@ void AbstractShaderProgramGLTest::uniformDoubleMatrix() {
 }
 
 void AbstractShaderProgramGLTest::uniformDoubleArray() {
+    if(!Context::current().isExtensionSupported<Extensions::ARB::gpu_shader_fp64>())
+        CORRADE_SKIP(Extensions::ARB::gpu_shader_fp64::string() + std::string{" is not supported."});
+
     MyDoubleShader shader;
 
     MAGNUM_VERIFY_NO_GL_ERROR();

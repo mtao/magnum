@@ -85,11 +85,19 @@ endif()
 if(WITH_GL)
     add_library(snippets-MagnumGL STATIC
         MagnumGL.cpp
-        MagnumMeshTools.cpp
+        MagnumMeshTools-gl.cpp
         MagnumShaders.cpp
         MagnumText.cpp)
     target_link_libraries(snippets-MagnumGL PRIVATE MagnumGL)
     set_target_properties(snippets-MagnumGL PROPERTIES FOLDER "Magnum/doc/snippets")
+endif()
+
+if(WITH_MESHTOOLS)
+    add_library(snippets-MagnumMeshTools STATIC
+        MagnumMeshTools.cpp
+        MagnumMeshTools-gl.cpp)
+    target_link_libraries(snippets-MagnumMeshTools PRIVATE MagnumMeshTools)
+    set_target_properties(snippets-MagnumMeshTools PROPERTIES FOLDER "Magnum/doc/snippets")
 endif()
 
 if(WITH_TRADE)

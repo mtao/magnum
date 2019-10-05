@@ -209,7 +209,7 @@ namespace AMD {
     _extension(123,ARB,texture_barrier,                 GL210, GL450) // #167
     _extension(124,ARB,pipeline_statistics_query,       GL300, GL460) // #171
     _extension(125,ARB,sparse_buffer,                   GL210,  None) // #172
-    _extension(126,ARB,transform_feedback_overflow_query, GL300, None) // #173
+    _extension(126,ARB,transform_feedback_overflow_query, GL300, GL460) // #173
     _extension(127,ARB,ES3_2_compatibility,             GL450,  None) // #177
     _extension(128,ARB,shader_atomic_counter_ops,       GL300, GL460) // #182
     _extension(129,ARB,gl_spirv,                        GL330, GL460) // #190
@@ -219,11 +219,12 @@ namespace AMD {
 } namespace ATI {
     _extension(133,ATI,texture_mirror_once,             GL210,  None) // #221
 } namespace EXT {
-    _extension(140,EXT,texture_filter_anisotropic,      GL210,  None) // #187
-    _extension(141,EXT,texture_compression_s3tc,        GL210,  None) // #198
+    _extension(139,EXT,texture_filter_anisotropic,      GL210,  None) // #187
+    _extension(140,EXT,texture_compression_s3tc,        GL210,  None) // #198
     /* EXT_framebuffer_object, EXT_packed_depth_stencil, EXT_framebuffer_blit,
        EXT_framebuffer_multisample replaced with ARB_framebuffer_object */
-    _extension(142,EXT,texture_mirror_clamp,            GL210,  None) // #298
+    _extension(141,EXT,texture_mirror_clamp,            GL210,  None) // #298
+    _extension(142,EXT,texture_compression_dxt1,        GL210,  None) // #309
     _extension(143,EXT,gpu_shader4,                     GL210, GL300) // #326
     _extension(144,EXT,packed_float,                    GL210, GL300) // #328
     _extension(145,EXT,texture_array,                   GL210, GL300) // #329
@@ -237,6 +238,7 @@ namespace AMD {
     _extension(153,EXT,shader_integer_mix,              GL300,  None) // #437
     _extension(154,EXT,debug_label,                     GL210,  None) // #439
     _extension(155,EXT,debug_marker,                    GL210,  None) // #440
+    _extension(156,EXT,texture_sRGB_R8,                 GL210,  None) // #534
 } namespace GREMEDY {
     _extension(157,GREMEDY,string_marker,               GL210,  None) // #311
 } namespace KHR {
@@ -248,11 +250,12 @@ namespace AMD {
     _extension(165,KHR,robustness,                      GL320, GL450) // #170
     _extension(166,KHR,blend_equation_advanced,         GL210,  None) // #174
     _extension(167,KHR,blend_equation_advanced_coherent, GL210, None) // #174
-    _extension(168,KHR,no_error,                        GL210,  None) // #175
+    _extension(168,KHR,no_error,                        GL210, GL460) // #175
+    _extension(169,KHR,texture_compression_astc_sliced_3d, GL210, None) // #189
 } namespace NV {
-    _extension(169,NV,primitive_restart,                GL210, GL310) // #285
-    _extension(170,NV,depth_buffer_float,               GL210, GL300) // #334
-    _extension(171,NV,conditional_render,               GL210, GL300) // #346
+    _extension(175,NV,primitive_restart,                GL210, GL310) // #285
+    _extension(176,NV,depth_buffer_float,               GL210, GL300) // #334
+    _extension(177,NV,conditional_render,               GL210, GL300) // #346
     /* NV_draw_texture not supported */                               // #430
 } namespace MAGNUM {
     _extension(180,MAGNUM,shader_vertex_id,             GL300, GL300)
@@ -275,29 +278,43 @@ namespace ANGLE {
     #ifdef MAGNUM_TARGET_GLES2
     _extension( 7,EXT,shader_texture_lod,           GLES200, GLES300) // #27
     #endif
+    #ifndef MAGNUM_TARGET_GLES2
+    /* Replaces WEBGL_color_buffer_float from WebGL 1 */
     _extension( 8,EXT,color_buffer_float,           GLES300,    None) // #31
+    #endif
+    _extension( 9,EXT,texture_compression_rgtc,     GLES200,    None) // #38
+    _extension(10,EXT,texture_compression_bptc,     GLES200,    None) // #39
 } namespace OES {
     #ifdef MAGNUM_TARGET_GLES2
-    _extension( 9,OES,texture_float,                GLES200, GLES300) // #1
-    _extension(10,OES,texture_half_float,           GLES200, GLES300) // #2
-    _extension(11,OES,standard_derivatives,         GLES200, GLES300) // #4
-    _extension(12,OES,vertex_array_object,          GLES200, GLES300) // #5
-    _extension(13,OES,element_index_uint,           GLES200, GLES300) // #10
+    _extension(15,OES,texture_float,                GLES200, GLES300) // #1
+    _extension(16,OES,texture_half_float,           GLES200, GLES300) // #2
+    _extension(17,OES,standard_derivatives,         GLES200, GLES300) // #4
+    _extension(18,OES,vertex_array_object,          GLES200, GLES300) // #5
+    _extension(19,OES,element_index_uint,           GLES200, GLES300) // #10
     #endif
-    _extension(14,OES,texture_float_linear,         GLES200,    None) // #20
+    _extension(20,OES,texture_float_linear,         GLES200,    None) // #20
     #ifdef MAGNUM_TARGET_GLES2
-    _extension(15,OES,texture_half_float_linear,    GLES200, GLES300) // #21
-    _extension(16,OES,fbo_render_mipmap,            GLES200, GLES300) // #28
+    _extension(21,OES,texture_half_float_linear,    GLES200, GLES300) // #21
+    _extension(22,OES,fbo_render_mipmap,            GLES200, GLES300) // #28
     #endif
 } namespace WEBGL {
-    _extension(17,WEBGL,compressed_texture_s3tc,    GLES200,    None) // #8
+    _extension(25,WEBGL,compressed_texture_s3tc,    GLES200,    None) // #8
     #ifdef MAGNUM_TARGET_GLES2
-    _extension(18,WEBGL,depth_texture,              GLES200, GLES300) // #9
-    _extension(19,WEBGL,color_buffer_float,         GLES200,    None) // #14
-    _extension(20,WEBGL,draw_buffers,               GLES200, GLES300) // #18
+    _extension(26,WEBGL,depth_texture,              GLES200, GLES300) // #9
     #endif
+    _extension(27,WEBGL,compressed_texture_pvrtc,   GLES200,    None) // #13
+    #ifdef MAGNUM_TARGET_GLES2
+    /* Subsumed by the EXT_color_buffer_float extension in WebGL 2, so
+       not exposing it on WebGL 2 builds even though it's not in core */
+    _extension(28,WEBGL,color_buffer_float,         GLES200,    None) // #14
+    _extension(29,WEBGL,draw_buffers,               GLES200, GLES300) // #18
+    #endif
+    _extension(30,WEBGL,compressed_texture_astc,    GLES200,    None) // #30
+    _extension(31,WEBGL,compressed_texture_s3tc_srgb, GLES200,  None) // #32
 } namespace MAGNUM {
-    _extension(30,MAGNUM,shader_vertex_id,          GLES300, GLES300)
+    #ifndef MAGNUM_TARGET_GLES2
+    _extension(40,MAGNUM,shader_vertex_id,          GLES300, GLES300)
+    #endif
 }
 #else
 namespace ANDROID {
@@ -309,27 +326,33 @@ namespace ANDROID {
     _extension(  2,ANGLE,framebuffer_blit,          GLES200, GLES300) // #83
     _extension(  3,ANGLE,framebuffer_multisample,   GLES200, GLES300) // #84
     _extension(  4,ANGLE,instanced_arrays,          GLES200, GLES300) // #109
-    _extension(  5,ANGLE,depth_texture,             GLES200, GLES300) // #138
+    #endif
+    _extension(  5,ANGLE,texture_compression_dxt1,  GLES200,    None) // #111
+    _extension(  6,ANGLE,texture_compression_dxt3,  GLES200,    None) // #111
+    _extension(  7,ANGLE,texture_compression_dxt5,  GLES200,    None) // #111
+    #ifdef MAGNUM_TARGET_GLES2
+    _extension(  8,ANGLE,depth_texture,             GLES200, GLES300) // #138
     #endif
 } namespace APPLE {
     #ifdef MAGNUM_TARGET_GLES2
-    _extension(  6,APPLE,framebuffer_multisample,   GLES200, GLES300) // #78
+    _extension(  9,APPLE,framebuffer_multisample,   GLES200, GLES300) // #78
     #endif
-    _extension(  7,APPLE,texture_format_BGRA8888,   GLES200,   None) // #79
+    _extension( 10,APPLE,texture_format_BGRA8888,   GLES200,    None) // #79
     #ifdef MAGNUM_TARGET_GLES2
-    _extension(  8,APPLE,texture_max_level,         GLES200,    None) // #80
+    _extension( 11,APPLE,texture_max_level,         GLES200, GLES300) // #80
     #endif
 } namespace ARM {
     #ifdef MAGNUM_TARGET_GLES2
-    _extension(  9,ARM,rgba8,                       GLES200, GLES300) // #82
+    _extension( 12,ARM,rgba8,                       GLES200, GLES300) // #82
     #endif
-    _extension( 10,ARM,shader_framebuffer_fetch,    GLES200,    None) // #165
-    _extension( 11,ARM,shader_framebuffer_fetch_depth_stencil, GLES200, None) // #166
+    _extension( 13,ARM,shader_framebuffer_fetch,    GLES200,    None) // #165
+    _extension( 14,ARM,shader_framebuffer_fetch_depth_stencil, GLES200, None) // #166
 } namespace EXT {
-    _extension( 20,EXT,texture_filter_anisotropic,  GLES200,   None) // #41
+    _extension( 19,EXT,texture_filter_anisotropic,  GLES200,    None) // #41
     #ifdef MAGNUM_TARGET_GLES2
-    _extension( 21,EXT,texture_type_2_10_10_10_REV, GLES200, GLES300) // #42
+    _extension( 20,EXT,texture_type_2_10_10_10_REV, GLES200, GLES300) // #42
     #endif
+    _extension( 21,EXT,texture_compression_dxt1,    GLES200,    None) // #49
     _extension( 22,EXT,texture_format_BGRA8888,     GLES200,    None) // #51
     #ifdef MAGNUM_TARGET_GLES2
     _extension( 23,EXT,discard_framebuffer,         GLES200, GLES300) // #64
@@ -370,28 +393,38 @@ namespace ANDROID {
     _extension( 45,EXT,texture_sRGB_decode,         GLES200,    None) // #152
     _extension( 46,EXT,sRGB_write_control,          GLES200,    None) // #153
     _extension( 47,EXT,texture_compression_s3tc,    GLES200,    None) // #154
+    _extension( 48,EXT,pvrtc_sRGB,                  GLES200,    None) // #155
     #ifdef MAGNUM_TARGET_GLES2
-    _extension( 48,EXT,instanced_arrays,            GLES200, GLES300) // #156
-    _extension( 49,EXT,draw_instanced,              GLES200, GLES300) // #157
+    _extension( 49,EXT,instanced_arrays,            GLES200, GLES300) // #156
+    _extension( 50,EXT,draw_instanced,              GLES200, GLES300) // #157
     #endif
     #ifndef MAGNUM_TARGET_GLES2
-    _extension( 50,EXT,shader_integer_mix,          GLES300,    None) // #161
-    _extension( 51,EXT,copy_image,                  GLES300, GLES320) // #175
+    _extension( 51,EXT,shader_integer_mix,          GLES300,    None) // #161
+    _extension( 52,EXT,copy_image,                  GLES300, GLES320) // #175
     #endif
-    _extension( 52,EXT,draw_buffers_indexed,        GLES200, GLES320) // #176
+    _extension( 53,EXT,draw_buffers_indexed,        GLES200, GLES320) // #176
     #ifndef MAGNUM_TARGET_GLES2
-    _extension( 53,EXT,geometry_shader,             GLES310, GLES320) // #177
-    _extension( 54,EXT,gpu_shader5,                 GLES310, GLES320) // #178
-    _extension( 55,EXT,shader_io_blocks,            GLES310, GLES320) // #180
-    _extension( 56,EXT,tessellation_shader,         GLES310, GLES320) // #181
+    _extension( 54,EXT,geometry_shader,             GLES310, GLES320) // #177
+    _extension( 55,EXT,gpu_shader5,                 GLES310, GLES320) // #178
+    _extension( 56,EXT,shader_io_blocks,            GLES310, GLES320) // #180
+    _extension( 57,EXT,tessellation_shader,         GLES310, GLES320) // #181
     #endif
-    _extension( 57,EXT,texture_border_clamp,        GLES200, GLES320) // #182
+    _extension( 58,EXT,texture_border_clamp,        GLES200, GLES320) // #182
     #ifndef MAGNUM_TARGET_GLES2
-    _extension( 58,EXT,texture_buffer,              GLES310, GLES320) // #183
-    _extension( 59,EXT,texture_cube_map_array,      GLES310, GLES320) // #184
-    _extension( 60,EXT,primitive_bounding_box,      GLES310, GLES320) // #186
+    _extension( 59,EXT,texture_buffer,              GLES310, GLES320) // #183
+    _extension( 60,EXT,texture_cube_map_array,      GLES310, GLES320) // #184
+    _extension( 61,EXT,primitive_bounding_box,      GLES310, GLES320) // #186
+    _extension( 62,EXT,texture_sRGB_R8,             GLES300,    None) // #221
+    _extension( 63,EXT,texture_sRGB_RG8,            GLES300,    None) // #223
     #endif
-    _extension( 61,EXT,polygon_offset_clamp,        GLES200,    None) // #252
+    _extension( 64,EXT,polygon_offset_clamp,        GLES200,    None) // #252
+    #ifndef MAGNUM_TARGET_GLES2
+    _extension( 65,EXT,texture_compression_rgtc,    GLES300,    None) // #286
+    _extension( 66,EXT,texture_compression_bptc,    GLES300,    None) // #287
+    #endif
+    _extension( 67,EXT,texture_compression_s3tc_srgb, GLES200,  None) // #289
+} namespace IMG {
+    _extension( 68,IMG,texture_compression_pvrtc,   GLES200,    None) // #54
 } namespace KHR {
     _extension( 70,KHR,texture_compression_astc_ldr,GLES200, GLES320) // #117
     _extension( 71,KHR,texture_compression_astc_hdr,GLES200,    None) // #117
@@ -402,6 +435,7 @@ namespace ANDROID {
     _extension( 76,KHR,robust_buffer_access_behavior, GLES200, GLES320) // #189
     _extension( 77,KHR,context_flush_control,       GLES200,    None) // #191
     _extension( 78,KHR,no_error,                    GLES200,    None) // #243
+    _extension( 79,KHR,texture_compression_astc_sliced_3d, GLES200, None) // #249
 } namespace NV {
     #ifdef MAGNUM_TARGET_GLES2
     _extension( 80,NV,draw_buffers,                 GLES200, GLES300) // #91
@@ -459,17 +493,20 @@ namespace ANDROID {
     _extension(120,OES,surfaceless_context,         GLES200, GLES300) // #116
     #endif
     #ifndef MAGNUM_TARGET_GLES2
-    _extension(121,OES,sample_shading,              GLES300, GLES320) // #169
-    _extension(122,OES,sample_variables,            GLES300, GLES320) // #170
-    _extension(123,OES,shader_image_atomic,         GLES310, GLES320) // #171
-    _extension(124,OES,shader_multisample_interpolation, GLES300, GLES320) // #172
+    _extension(121,OES,texture_compression_astc,    GLES300,    None) // #162
+    _extension(122,OES,sample_shading,              GLES300, GLES320) // #169
+    _extension(123,OES,sample_variables,            GLES300, GLES320) // #170
+    _extension(124,OES,shader_image_atomic,         GLES310, GLES320) // #171
+    _extension(125,OES,shader_multisample_interpolation, GLES300, GLES320) // #172
     #endif
-    _extension(125,OES,texture_stencil8,            GLES200, GLES320) // #173
+    _extension(126,OES,texture_stencil8,            GLES200, GLES320) // #173
     #ifndef MAGNUM_TARGET_GLES2
-    _extension(126,OES,texture_storage_multisample_2d_array, GLES310, GLES320) // #174
+    _extension(127,OES,texture_storage_multisample_2d_array, GLES310, GLES320) // #174
     #endif
 } namespace MAGNUM {
+    #ifndef MAGNUM_TARGET_GLES2
     _extension(130,MAGNUM,shader_vertex_id,         GLES300, GLES300)
+    #endif
 }
 #endif
 #undef _extension

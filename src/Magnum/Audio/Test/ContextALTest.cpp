@@ -24,6 +24,8 @@
     DEALINGS IN THE SOFTWARE.
 */
 
+#include <sstream>
+#include <Corrade/Containers/ArrayView.h>
 #include <Corrade/TestSuite/Tester.h>
 
 #include "Magnum/Audio/Extensions.h"
@@ -37,23 +39,36 @@ struct ContextALTest: TestSuite::Tester {
     void construct();
     void constructMove();
 
+    void quietLog();
+    void ignoreUnrelatedOptions();
+
     void extensionsString();
-    void isExtensionEnabled();
+    void isExtensionSupported();
+    void isExtensionUnsupported();
+    void isExtensionDisabled();
 };
 
-ContextALTest::ContextALTest() {
+ContextALTest::ContextALTest():
+    TestSuite::Tester{TestSuite::Tester::TesterConfiguration{}
+        .setSkippedArgumentPrefixes({"magnum"})}
+{
     addTests({&ContextALTest::construct,
-              &ContextALTest::constructMove,
+              &ContextALTest::constructMove});
 
+    addInstancedTests({&ContextALTest::quietLog}, 2);
+
+    addTests({&ContextALTest::ignoreUnrelatedOptions,
               &ContextALTest::extensionsString,
-              &ContextALTest::isExtensionEnabled});
+              &ContextALTest::isExtensionSupported,
+              &ContextALTest::isExtensionUnsupported,
+              &ContextALTest::isExtensionDisabled});
 }
 
 void ContextALTest::construct() {
     CORRADE_VERIFY(!Context::hasCurrent());
 
     {
-        Context context;
+        Context context{arguments().first, arguments().second};
         CORRADE_VERIFY(Context::hasCurrent());
         CORRADE_COMPARE(&Context::current(), &context);
     }
@@ -73,6 +88,26 @@ void ContextALTest::constructMove() {
     CORRADE_VERIFY(!Context::hasCurrent());
 }
 
+void ContextALTest::quietLog() {
+    setTestCaseDescription(testCaseInstanceId() ? "true" : "false");
+
+    const char* argv[] = { "", "--magnum-log", testCaseInstanceId() ? "quiet" : "default" };
+
+    std::ostringstream out;
+    Debug redirectOutput{&out};
+    /* MSVC 2015 and 2017 needs the int cast otherwise C2398 */
+    Context context{int(Containers::arraySize(argv)), argv};
+    CORRADE_COMPARE(out.str().empty(), bool(testCaseInstanceId()));
+}
+
+void ContextALTest::ignoreUnrelatedOptions() {
+    const char* argv[] = { "", "--magnum-gpu-validation", "on" };
+
+    /* MSVC 2015 and 2017 needs the int cast otherwise C2398 */
+    Context context{int(Containers::arraySize(argv)), argv};
+    CORRADE_VERIFY(Context::hasCurrent());
+}
+
 void ContextALTest::extensionsString() {
     Context context;
 
@@ -81,10 +116,44 @@ void ContextALTest::extensionsString() {
     CORRADE_VERIFY(!extensions.empty());
 }
 
-void ContextALTest::isExtensionEnabled() {
+void ContextALTest::isExtensionSupported() {
+    Context context;
+    CORRADE_VERIFY(context.isExtensionSupported<Extensions::ALC::EXT::ENUMERATION>());
+    CORRADE_VERIFY(!context.isExtensionDisabled<Extensions::ALC::EXT::ENUMERATION>());
+
+    Extension e{Extensions::ALC::EXT::ENUMERATION::Index,
+                Extensions::ALC::EXT::ENUMERATION::string()};
+    CORRADE_VERIFY(context.isExtensionSupported(e));
+    CORRADE_VERIFY(!context.isExtensionDisabled(e));
+}
+
+void ContextALTest::isExtensionUnsupported() {
     Context context;
 
-    CORRADE_VERIFY(Context::current().isExtensionSupported<Extensions::ALC::EXT::ENUMERATION>());
+    if(context.isExtensionSupported<Extensions::ALC::SOFTX::HRTF>())
+        CORRADE_SKIP("Extension" + std::string{Extensions::ALC::SOFTX::HRTF::string()} + " is supported, can't test.");
+
+    CORRADE_VERIFY(!context.isExtensionSupported<Extensions::ALC::SOFTX::HRTF>());
+    CORRADE_VERIFY(!context.isExtensionDisabled<Extensions::ALC::SOFTX::HRTF>());
+
+    Extension e{Extensions::ALC::SOFTX::HRTF::Index,
+                Extensions::ALC::SOFTX::HRTF::string()};
+    CORRADE_VERIFY(!context.isExtensionSupported(e));
+    CORRADE_VERIFY(!context.isExtensionDisabled(e));
+}
+
+void ContextALTest::isExtensionDisabled() {
+    /* Yes, FFS. this is a weird-ass name */
+    const char* argv[] = { "", "--magnum-disable-extensions", "ALC_ENUMERATION_EXT" };
+    /* MSVC 2015 and 2017 needs the int cast otherwise C2398 */
+    Context context{int(Containers::arraySize(argv)), argv};
+    CORRADE_VERIFY(!context.isExtensionSupported<Extensions::ALC::EXT::ENUMERATION>());
+    CORRADE_VERIFY(context.isExtensionDisabled<Extensions::ALC::EXT::ENUMERATION>());
+
+    Extension e{Extensions::ALC::EXT::ENUMERATION::Index,
+                Extensions::ALC::EXT::ENUMERATION::string()};
+    CORRADE_VERIFY(!context.isExtensionSupported(e));
+    CORRADE_VERIFY(context.isExtensionDisabled(e));
 }
 
 }}}}

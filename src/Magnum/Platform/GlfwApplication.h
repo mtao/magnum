@@ -58,6 +58,8 @@ namespace Implementation {
 /** @nosubgrouping
 @brief GLFW application
 
+@m_keywords{Application}
+
 Application using the [GLFW](http://glfw.org) toolkit. Supports keyboard and
 mouse handling with support for changing cursor and mouse tracking and warping.
 
@@ -94,13 +96,17 @@ See @ref cmake for more information.
 
 @section Platform-GlfwApplication-usage General usage
 
-In order to use this library from CMake, you need to copy `FindGLFW.cmake` from
-the modules directory in Magnum source to the `modules/` dir in your project
-(so it is able to find the GLFW library). Request the `GlfwApplication`
-component of the `Magnum` package and link to the `Magnum::GlfwApplication`
-target:
+In order to use this library from CMake, you need to copy
+[FindGLFW.cmake](https://github.com/mosra/magnum/blob/master/modules/FindGLFW.cmake)
+from the `modules/` directory in Magnum sources to a `modules/` dir in your
+project and pointing `CMAKE_MODULE_PATH` to it (if not done already) so it is
+able to find the GLFW library. Then request the `GlfwApplication` component of
+the `Magnum` package and link to the `Magnum::GlfwApplication` target:
 
 @code{.cmake}
+# Path where FindGLFW.cmake can be found, adapt as needed
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
+
 find_package(Magnum REQUIRED GlfwApplication)
 
 # ...
@@ -401,6 +407,13 @@ class GlfwApplication {
         Vector2 dpiScaling(const Configuration& configuration) const;
 
         /**
+         * @brief Set window title
+         *
+         * The @p title is expected to be encoded in UTF-8.
+         */
+        void setWindowTitle(const std::string& title);
+
+        /**
          * @brief Swap buffers
          *
          * Paints currently rendered framebuffer on screen.
@@ -577,17 +590,15 @@ class GlfwApplication {
         #endif
         int _exitCode = 0;
 
-        Vector2i _minWindowSize;
-        Vector2i _maxWindowSize;
+        Vector2i _minWindowSize, _maxWindowSize;
+        Vector2i _previousMouseMovePosition{-1};
 };
-
-CORRADE_ENUMSET_OPERATORS(GlfwApplication::Flags)
 
 #ifdef MAGNUM_TARGET_GL
 /**
 @brief OpenGL context configuration
 
-The created window is always with double-buffered OpenGL context.
+The created window is always with a double-buffered OpenGL context.
 
 @note This function is available only if Magnum is compiled with
     @ref MAGNUM_TARGET_GL enabled (done by default). See @ref building-features
@@ -600,7 +611,7 @@ class GlfwApplication::GLConfiguration {
         /**
          * @brief Context flag
          *
-         * @see @ref Flags, @ref setFlags(), @ref Context::Flag
+         * @see @ref Flags, @ref setFlags(), @ref GL::Context::Flag
          */
         enum class Flag: UnsignedByte {
             #ifndef MAGNUM_TARGET_GLES
@@ -624,14 +635,20 @@ class GlfwApplication::GLConfiguration {
             NoError = 1 << 1,
             #endif
 
-            Debug = 1 << 2,     /**< Debug context */
+            /**
+             * Debug context. Enabled automatically if the
+             * `--magnum-gpu-validation` @ref GL-Context-command-line "command-line option"
+             * is present.
+             */
+            Debug = 1 << 2,
+
             Stereo = 1 << 3     /**< Stereo rendering */
         };
 
         /**
          * @brief Context flags
          *
-         * @see @ref setFlags()
+         * @see @ref setFlags(), @ref GL::Context::Flags
          */
         typedef Containers::EnumSet<Flag> Flags;
 
@@ -1268,8 +1285,6 @@ CORRADE_ENUMSET_OPERATORS(GlfwApplication::InputEvent::Modifiers)
 @see @ref keyPressEvent(), @ref keyReleaseEvent()
 */
 class GlfwApplication::KeyEvent: public GlfwApplication::InputEvent {
-    friend GlfwApplication;
-
     public:
         /**
          * @brief Key
@@ -1485,6 +1500,8 @@ class GlfwApplication::KeyEvent: public GlfwApplication::InputEvent {
         bool isRepeated() const { return _repeated; }
 
     private:
+        friend GlfwApplication;
+
         explicit KeyEvent(Key key, Modifiers modifiers, bool repeated): _key{key}, _modifiers{modifiers}, _repeated{repeated} {}
 
         const Key _key;
@@ -1499,8 +1516,6 @@ class GlfwApplication::KeyEvent: public GlfwApplication::InputEvent {
     @ref mouseReleaseEvent()
 */
 class GlfwApplication::MouseEvent: public GlfwApplication::InputEvent {
-    friend GlfwApplication;
-
     public:
         /**
          * @brief Mouse button
@@ -1531,6 +1546,8 @@ class GlfwApplication::MouseEvent: public GlfwApplication::InputEvent {
         Modifiers modifiers() const { return _modifiers; }
 
     private:
+        friend GlfwApplication;
+
         explicit MouseEvent(Button button, const Vector2i& position, Modifiers modifiers): _button{button}, _position{position}, _modifiers{modifiers} {}
 
         const Button _button;
@@ -1544,8 +1561,6 @@ class GlfwApplication::MouseEvent: public GlfwApplication::InputEvent {
 @see @ref MouseEvent, @ref MouseScrollEvent, @ref mouseMoveEvent()
 */
 class GlfwApplication::MouseMoveEvent: public GlfwApplication::InputEvent {
-    friend GlfwApplication;
-
     public:
         /**
          * @brief Mouse button
@@ -1576,6 +1591,16 @@ class GlfwApplication::MouseMoveEvent: public GlfwApplication::InputEvent {
         Vector2i position() const { return _position; }
 
         /**
+         * @brief Relative position
+         *
+         * Position relative to previous move event. Unlike
+         * @ref Sdl2Application, GLFW doesn't provide relative position
+         * directly, so this is calculated explicitly as a delta from previous
+         * move event position.
+         */
+        Vector2i relativePosition() const { return _relativePosition; }
+
+        /**
          * @brief Modifiers
          *
          * Lazily populated on first request.
@@ -1583,10 +1608,12 @@ class GlfwApplication::MouseMoveEvent: public GlfwApplication::InputEvent {
         Modifiers modifiers();
 
     private:
-        explicit MouseMoveEvent(GLFWwindow* window, const Vector2i& position): _window{window}, _position{position} {}
+        friend GlfwApplication;
+
+        explicit MouseMoveEvent(GLFWwindow* window, const Vector2i& position, const Vector2i& relativePosition): _window{window}, _position{position}, _relativePosition{relativePosition} {}
 
         GLFWwindow* const _window;
-        const Vector2i _position;
+        const Vector2i _position, _relativePosition;
         Containers::Optional<Buttons> _buttons;
         Containers::Optional<Modifiers> _modifiers;
 };
@@ -1599,8 +1626,6 @@ CORRADE_ENUMSET_OPERATORS(GlfwApplication::MouseMoveEvent::Buttons)
 @see @ref MouseEvent, @ref MouseMoveEvent, @ref mouseScrollEvent()
 */
 class GlfwApplication::MouseScrollEvent: public GlfwApplication::InputEvent {
-    friend GlfwApplication;
-
     public:
         /** @brief Scroll offset */
         Vector2 offset() const { return _offset; }
@@ -1620,6 +1645,8 @@ class GlfwApplication::MouseScrollEvent: public GlfwApplication::InputEvent {
         Modifiers modifiers();
 
     private:
+        friend GlfwApplication;
+
         explicit MouseScrollEvent(GLFWwindow* window, const Vector2& offset): _window{window}, _offset{offset} {}
 
         GLFWwindow* const _window;
@@ -1634,8 +1661,6 @@ class GlfwApplication::MouseScrollEvent: public GlfwApplication::InputEvent {
 @see @ref textInputEvent()
 */
 class GlfwApplication::TextInputEvent {
-    friend GlfwApplication;
-
     public:
         /** @brief Copying is not allowed */
         TextInputEvent(const TextInputEvent&) = delete;
@@ -1666,6 +1691,8 @@ class GlfwApplication::TextInputEvent {
         Containers::ArrayView<const char> text() const { return _text; }
 
     private:
+        friend GlfwApplication;
+
         explicit TextInputEvent(Containers::ArrayView<const char> text): _text{text}, _accepted{false} {}
 
         const Containers::ArrayView<const char> _text;

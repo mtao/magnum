@@ -26,8 +26,10 @@
 #include <unordered_map>
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/Utility/Directory.h>
+#include <Corrade/Utility/Resource.h>
 
 #include "Magnum/FileCallback.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
 #include "Magnum/Animation/Player.h"
 #include "Magnum/MeshTools/Transform.h"

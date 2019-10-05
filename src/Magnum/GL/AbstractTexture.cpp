@@ -30,6 +30,7 @@
 
 #include "Magnum/Array.h"
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #ifndef MAGNUM_TARGET_GLES2
 #include "Magnum/GL/BufferImage.h"
 #endif
@@ -538,12 +539,19 @@ void AbstractTexture::bindInternal() {
 namespace {
 
 PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic error "-Wswitch"
+    #endif
     switch(internalFormat) {
         #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
         case TextureFormat::Red:
         case TextureFormat::R8:
         #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::R8Snorm:
+        #endif
+        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::SR8:
         #endif
         #ifndef MAGNUM_TARGET_GLES
         case TextureFormat::R16:
@@ -555,14 +563,25 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #endif
         #ifndef MAGNUM_TARGET_GLES
         case TextureFormat::CompressedRed:
-        case TextureFormat::CompressedRedRgtc1:
-        case TextureFormat::CompressedSignedRedRgtc1:
         #endif
         #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::CompressedR11Eac:
         case TextureFormat::CompressedSignedR11Eac:
         #endif
             return PixelFormat::Red;
+        #endif
+
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
+        case TextureFormat::CompressedRedRgtc1:
+        case TextureFormat::CompressedSignedRedRgtc1:
+            #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
+            return PixelFormat::Red;
+            #else
+            /* RGTC is on WebGL 1 but there's no Red pixel format (which is
+               okay because WebGL doesn't allow compression by upload anyway).
+               Assert here to have the enum value handled. */
+            CORRADE_ASSERT(false, "No single-component pixel format in WebGL 1 for RGTC compression", {});
+            #endif
         #endif
 
         #ifndef MAGNUM_TARGET_GLES2
@@ -581,6 +600,9 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::RG8Snorm:
         #endif
+        #ifdef MAGNUM_TARGET_GLES
+        case TextureFormat::SRG8:
+        #endif
         #ifndef MAGNUM_TARGET_GLES
         case TextureFormat::RG16:
         case TextureFormat::RG16Snorm:
@@ -591,14 +613,25 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #endif
         #ifndef MAGNUM_TARGET_GLES
         case TextureFormat::CompressedRG:
-        case TextureFormat::CompressedRGRgtc2:
-        case TextureFormat::CompressedSignedRGRgtc2:
         #endif
         #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::CompressedRG11Eac:
         case TextureFormat::CompressedSignedRG11Eac:
         #endif
             return PixelFormat::RG;
+        #endif
+
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
+        case TextureFormat::CompressedRGRgtc2:
+        case TextureFormat::CompressedSignedRGRgtc2:
+            #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
+            return PixelFormat::RG;
+            #else
+            /* RGTC is on WebGL 1 but there's no RG pixel format (which is okay
+               because WebGL doesn't allow compression by upload anyway).
+               Assert here to have the enum value handled. */
+            CORRADE_ASSERT(false, "No two-component pixel format in WebGL 1 for RGTC compression", {});
+            #endif
         #endif
 
         #ifndef MAGNUM_TARGET_GLES2
@@ -627,7 +660,7 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::RGB32F:
         #endif
         #ifndef MAGNUM_TARGET_GLES
-        case TextureFormat::R3B3G2:
+        case TextureFormat::R3G3B2:
         case TextureFormat::RGB4:
         case TextureFormat::RGB5:
         #endif
@@ -644,21 +677,34 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #endif
         #ifndef MAGNUM_TARGET_GLES
         case TextureFormat::CompressedRGB:
+        #endif
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
         case TextureFormat::CompressedRGBBptcUnsignedFloat:
         case TextureFormat::CompressedRGBBptcSignedFloat:
         #endif
         #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::CompressedRGB8Etc2:
-        case TextureFormat::CompressedSRGB8Etc2:
         #endif
         case TextureFormat::CompressedRGBS3tcDxt1:
+        #ifdef MAGNUM_TARGET_GLES
+        case TextureFormat::CompressedRGBPvrtc2bppV1:
+        case TextureFormat::CompressedRGBPvrtc4bppV1:
+        #endif
             return PixelFormat::RGB;
 
         #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
         case TextureFormat::SRGB:
         #endif
-        #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
+        #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::SRGB8:
+        #endif
+        #ifndef MAGNUM_TARGET_GLES2
+        case TextureFormat::CompressedSRGB8Etc2:
+        #endif
+        case TextureFormat::CompressedSRGBS3tcDxt1:
+        #if defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_WEBGL)
+        case TextureFormat::CompressedSRGBPvrtc2bppV1:
+        case TextureFormat::CompressedSRGBPvrtc4bppV1:
         #endif
             #ifndef MAGNUM_TARGET_GLES2
             return PixelFormat::RGB;
@@ -704,47 +750,34 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #endif
         #ifndef MAGNUM_TARGET_GLES
         case TextureFormat::CompressedRGBA:
+        #endif
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
         case TextureFormat::CompressedRGBABptcUnorm:
-        case TextureFormat::CompressedSRGBAlphaBptcUnorm:
         #endif
         #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::CompressedRGB8PunchthroughAlpha1Etc2:
-        case TextureFormat::CompressedSRGB8PunchthroughAlpha1Etc2:
         case TextureFormat::CompressedRGBA8Etc2Eac:
-        case TextureFormat::CompressedSRGB8Alpha8Etc2Eac:
         #endif
         case TextureFormat::CompressedRGBAS3tcDxt1:
         case TextureFormat::CompressedRGBAS3tcDxt3:
         case TextureFormat::CompressedRGBAS3tcDxt5:
-        #ifndef MAGNUM_TARGET_WEBGL
         case TextureFormat::CompressedRGBAAstc4x4:
-        case TextureFormat::CompressedSRGB8Alpha8Astc4x4:
         case TextureFormat::CompressedRGBAAstc5x4:
-        case TextureFormat::CompressedSRGB8Alpha8Astc5x4:
         case TextureFormat::CompressedRGBAAstc5x5:
-        case TextureFormat::CompressedSRGB8Alpha8Astc5x5:
         case TextureFormat::CompressedRGBAAstc6x5:
-        case TextureFormat::CompressedSRGB8Alpha8Astc6x5:
         case TextureFormat::CompressedRGBAAstc6x6:
-        case TextureFormat::CompressedSRGB8Alpha8Astc6x6:
         case TextureFormat::CompressedRGBAAstc8x5:
-        case TextureFormat::CompressedSRGB8Alpha8Astc8x5:
         case TextureFormat::CompressedRGBAAstc8x6:
-        case TextureFormat::CompressedSRGB8Alpha8Astc8x6:
         case TextureFormat::CompressedRGBAAstc8x8:
-        case TextureFormat::CompressedSRGB8Alpha8Astc8x8:
         case TextureFormat::CompressedRGBAAstc10x5:
-        case TextureFormat::CompressedSRGB8Alpha8Astc10x5:
         case TextureFormat::CompressedRGBAAstc10x6:
-        case TextureFormat::CompressedSRGB8Alpha8Astc10x6:
         case TextureFormat::CompressedRGBAAstc10x8:
-        case TextureFormat::CompressedSRGB8Alpha8Astc10x8:
         case TextureFormat::CompressedRGBAAstc10x10:
-        case TextureFormat::CompressedSRGB8Alpha8Astc10x10:
         case TextureFormat::CompressedRGBAAstc12x10:
-        case TextureFormat::CompressedSRGB8Alpha8Astc12x10:
         case TextureFormat::CompressedRGBAAstc12x12:
-        case TextureFormat::CompressedSRGB8Alpha8Astc12x12:
+        #ifdef MAGNUM_TARGET_GLES
+        case TextureFormat::CompressedRGBAPvrtc2bppV1:
+        case TextureFormat::CompressedRGBAPvrtc4bppV1:
         #endif
             return PixelFormat::RGBA;
 
@@ -753,6 +786,34 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #endif
         #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
         case TextureFormat::SRGB8Alpha8:
+        #endif
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
+        case TextureFormat::CompressedSRGBAlphaBptcUnorm:
+        #endif
+        #ifndef MAGNUM_TARGET_GLES2
+        case TextureFormat::CompressedSRGB8PunchthroughAlpha1Etc2:
+        case TextureFormat::CompressedSRGB8Alpha8Etc2Eac:
+        #endif
+        case TextureFormat::CompressedSRGBAlphaS3tcDxt1:
+        case TextureFormat::CompressedSRGBAlphaS3tcDxt3:
+        case TextureFormat::CompressedSRGBAlphaS3tcDxt5:
+        case TextureFormat::CompressedSRGB8Alpha8Astc4x4:
+        case TextureFormat::CompressedSRGB8Alpha8Astc5x4:
+        case TextureFormat::CompressedSRGB8Alpha8Astc5x5:
+        case TextureFormat::CompressedSRGB8Alpha8Astc6x5:
+        case TextureFormat::CompressedSRGB8Alpha8Astc6x6:
+        case TextureFormat::CompressedSRGB8Alpha8Astc8x5:
+        case TextureFormat::CompressedSRGB8Alpha8Astc8x6:
+        case TextureFormat::CompressedSRGB8Alpha8Astc8x8:
+        case TextureFormat::CompressedSRGB8Alpha8Astc10x5:
+        case TextureFormat::CompressedSRGB8Alpha8Astc10x6:
+        case TextureFormat::CompressedSRGB8Alpha8Astc10x8:
+        case TextureFormat::CompressedSRGB8Alpha8Astc10x10:
+        case TextureFormat::CompressedSRGB8Alpha8Astc12x10:
+        case TextureFormat::CompressedSRGB8Alpha8Astc12x12:
+        #if defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_WEBGL)
+        case TextureFormat::CompressedSRGBAlphaPvrtc2bppV1:
+        case TextureFormat::CompressedSRGBAlphaPvrtc4bppV1:
         #endif
             #ifndef MAGNUM_TARGET_GLES2
             return PixelFormat::RGBA;
@@ -805,11 +866,18 @@ PixelFormat pixelFormatForInternalFormat(const TextureFormat internalFormat) {
         #endif
             return PixelFormat::DepthStencil;
     }
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
 
     CORRADE_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
 }
 
 PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic error "-Wswitch"
+    #endif
     switch(internalFormat) {
         #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
         case TextureFormat::Red:
@@ -833,12 +901,20 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::Luminance:
         case TextureFormat::LuminanceAlpha:
         #endif
+        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::SR8:
+        #ifdef MAGNUM_TARGET_GLES
+        case TextureFormat::SRG8:
+        #endif
+        #endif
         #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
         case TextureFormat::SRGB:
         case TextureFormat::SRGBAlpha:
         #endif
-        #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
+        #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::SRGB8:
+        #endif
+        #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
         case TextureFormat::SRGB8Alpha8:
         #endif
         #ifndef MAGNUM_TARGET_GLES
@@ -847,6 +923,8 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::CompressedRG:
         case TextureFormat::CompressedRGB:
         case TextureFormat::CompressedRGBA:
+        #endif
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
         case TextureFormat::CompressedRedRgtc1:
         case TextureFormat::CompressedRGRgtc2:
         case TextureFormat::CompressedRGBABptcUnorm:
@@ -865,10 +943,13 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::CompressedSignedRG11Eac:
         #endif
         case TextureFormat::CompressedRGBS3tcDxt1:
+        case TextureFormat::CompressedSRGBS3tcDxt1:
         case TextureFormat::CompressedRGBAS3tcDxt1:
+        case TextureFormat::CompressedSRGBAlphaS3tcDxt1:
         case TextureFormat::CompressedRGBAS3tcDxt3:
+        case TextureFormat::CompressedSRGBAlphaS3tcDxt3:
         case TextureFormat::CompressedRGBAS3tcDxt5:
-        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::CompressedSRGBAlphaS3tcDxt5:
         case TextureFormat::CompressedRGBAAstc4x4:
         case TextureFormat::CompressedSRGB8Alpha8Astc4x4:
         case TextureFormat::CompressedRGBAAstc5x4:
@@ -897,6 +978,23 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::CompressedSRGB8Alpha8Astc12x10:
         case TextureFormat::CompressedRGBAAstc12x12:
         case TextureFormat::CompressedSRGB8Alpha8Astc12x12:
+        #ifdef MAGNUM_TARGET_GLES
+        case TextureFormat::CompressedRGBPvrtc2bppV1:
+        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::CompressedSRGBPvrtc2bppV1:
+        #endif
+        case TextureFormat::CompressedRGBAPvrtc2bppV1:
+        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::CompressedSRGBAlphaPvrtc2bppV1:
+        #endif
+        case TextureFormat::CompressedRGBPvrtc4bppV1:
+        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::CompressedSRGBPvrtc4bppV1:
+        #endif
+        case TextureFormat::CompressedRGBAPvrtc4bppV1:
+        #ifndef MAGNUM_TARGET_WEBGL
+        case TextureFormat::CompressedSRGBAlphaPvrtc4bppV1:
+        #endif
         #endif
             return PixelType::UnsignedByte;
 
@@ -909,11 +1007,20 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::RG8I:
         case TextureFormat::RGB8I:
         case TextureFormat::RGBA8I:
-        #ifndef MAGNUM_TARGET_GLES
+            return PixelType::Byte;
+        #endif
+
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
         case TextureFormat::CompressedSignedRedRgtc1:
         case TextureFormat::CompressedSignedRGRgtc2:
-        #endif
+            #ifndef MAGNUM_TARGET_GLES2
             return PixelType::Byte;
+            #else
+            /* RGTC is on WebGL 1 but there's no RG pixel format (which is okay
+               because WebGL doesn't allow compression by upload anyway).
+               Assert here to have the enum value handled. */
+            CORRADE_ASSERT(false, "No signed pixel type in OpenGL ES 2.0 for RGTC compression", {});
+            #endif
         #endif
 
         #ifndef MAGNUM_TARGET_GLES
@@ -969,20 +1076,22 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
         case TextureFormat::RGB32I:
         case TextureFormat::RGBA32I:
             return PixelType::Int;
+        #endif
 
+        #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
+        #ifndef MAGNUM_TARGET_GLES2
         case TextureFormat::R32F:
         case TextureFormat::RG32F:
         case TextureFormat::RGB32F:
         case TextureFormat::RGBA32F:
-        #ifndef MAGNUM_TARGET_GLES
+        #endif
         case TextureFormat::CompressedRGBBptcUnsignedFloat:
         case TextureFormat::CompressedRGBBptcSignedFloat:
-        #endif
             return PixelType::Float;
         #endif
 
         #ifndef MAGNUM_TARGET_GLES
-        case TextureFormat::R3B3G2:
+        case TextureFormat::R3G3B2:
             return PixelType::UnsignedByte332;
         case TextureFormat::RGB4:
             return PixelType::UnsignedShort4444;
@@ -1050,6 +1159,9 @@ PixelType pixelTypeForInternalFormat(const TextureFormat internalFormat) {
             return PixelType::Float32UnsignedInt248Rev;
         #endif
     }
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
 
     CORRADE_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
 }
@@ -1150,7 +1262,13 @@ void AbstractTexture::setMaxAnisotropyImplementationArb(GLfloat anisotropy) {
 #endif
 
 void AbstractTexture::setMaxAnisotropyImplementationExt(GLfloat anisotropy) {
-    (this->*Context::current().state().texture->parameterfImplementation)(GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
+    (this->*Context::current().state().texture->parameterfImplementation)(
+        #ifndef MAGNUM_TARGET_GLES
+        GL_TEXTURE_MAX_ANISOTROPY
+        #else
+        GL_TEXTURE_MAX_ANISOTROPY_EXT
+        #endif
+    , anisotropy);
 }
 
 #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
@@ -1601,6 +1719,24 @@ template void MAGNUM_GL_EXPORT AbstractTexture::image<1>(GLint, Image<1>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::image<2>(GLint, Image<2>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::image<3>(GLint, Image<3>&);
 
+template<UnsignedInt dimensions> void AbstractTexture::image(GLint level, const BasicMutableImageView<dimensions>& image) {
+    #ifndef CORRADE_NO_ASSERT
+    const Math::Vector<dimensions, Int> size = DataHelper<dimensions>::imageSize(*this, level);
+    CORRADE_ASSERT(image.data().data() != nullptr || !size.product(),
+        "GL::AbstractTexture::image(): image view is nullptr", );
+    CORRADE_ASSERT(image.size() == size,
+        "GL::AbstractTexture::image(): expected image view size" << size << "but got" << image.size(), );
+    #endif
+
+    Buffer::unbindInternal(Buffer::TargetHint::PixelPack);
+    Context::current().state().renderer->applyPixelStoragePack(image.storage());
+    (this->*Context::current().state().texture->getImageImplementation)(level, pixelFormat(image.format()), pixelType(image.format(), image.formatExtra()), image.data().size(), image.data());
+}
+
+template void MAGNUM_GL_EXPORT AbstractTexture::image<1>(GLint, const BasicMutableImageView<1>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::image<2>(GLint, const BasicMutableImageView<2>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::image<3>(GLint, const BasicMutableImageView<3>&);
+
 template<UnsignedInt dimensions> void AbstractTexture::image(GLint level, BufferImage<dimensions>& image, BufferUsage usage) {
     const Math::Vector<dimensions, Int> size = DataHelper<dimensions>::imageSize(*this, level);
     const std::size_t dataSize = Magnum::Implementation::imageDataSizeFor(image, size);
@@ -1651,6 +1787,44 @@ template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<1>(GLint, Compre
 template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<2>(GLint, CompressedImage<2>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<3>(GLint, CompressedImage<3>&);
 
+template<UnsignedInt dimensions> void AbstractTexture::compressedImage(const GLint level, const BasicMutableCompressedImageView<dimensions>& image) {
+    #ifndef CORRADE_NO_ASSERT
+    const Math::Vector<dimensions, Int> size = DataHelper<dimensions>::imageSize(*this, level);
+
+    CORRADE_ASSERT(image.data().data() != nullptr || !size.product(),
+        "GL::AbstractTexture::compressedImage(): image view is nullptr", );
+    CORRADE_ASSERT(image.size() == size,
+        "GL::AbstractTexture::compressedImage(): expected image view size" << size << "but got" << image.size(), );
+
+    /* If the user-provided pixel storage doesn't tell us all properties about
+       the compression, we need to ask GL for it */
+    std::size_t dataSize;
+    if(!image.storage().compressedBlockSize().product() || !image.storage().compressedBlockDataSize()) {
+        GLint textureDataSize;
+        (this->*Context::current().state().texture->getLevelParameterivImplementation)(level, GL_TEXTURE_COMPRESSED_IMAGE_SIZE, &textureDataSize);
+        dataSize = textureDataSize;
+    } else dataSize = Magnum::Implementation::compressedImageDataSizeFor(image, size);
+
+    CORRADE_ASSERT(image.data().size() == dataSize,
+        "GL::AbstractTexture::compressedImage(): expected image view data size" << dataSize << "bytes but got" << image.data().size(), );
+
+    /* Internal texture format */
+    GLint format;
+    (this->*Context::current().state().texture->getLevelParameterivImplementation)(level, GL_TEXTURE_INTERNAL_FORMAT, &format);
+
+    CORRADE_ASSERT(compressedPixelFormat(image.format()) == CompressedPixelFormat(format),
+        "GL::AbstractTexture::compressedImage(): expected image view format" << CompressedPixelFormat(format) << "but got" << compressedPixelFormat(image.format()), );
+    #endif
+
+    Buffer::unbindInternal(Buffer::TargetHint::PixelPack);
+    Context::current().state().renderer->applyPixelStoragePack(image.storage());
+    (this->*Context::current().state().texture->getCompressedImageImplementation)(level, image.data().size(), image.data());
+}
+
+template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<1>(GLint, const BasicMutableCompressedImageView<1>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<2>(GLint, const BasicMutableCompressedImageView<2>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<3>(GLint, const BasicMutableCompressedImageView<3>&);
+
 template<UnsignedInt dimensions> void AbstractTexture::compressedImage(const GLint level, CompressedBufferImage<dimensions>& image, BufferUsage usage) {
     const Math::Vector<dimensions, Int> size = DataHelper<dimensions>::imageSize(*this, level);
 
@@ -1683,27 +1857,41 @@ template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<2>(GLint, Compre
 template void MAGNUM_GL_EXPORT AbstractTexture::compressedImage<3>(GLint, CompressedBufferImage<3>&, BufferUsage);
 
 template<UnsignedInt dimensions> void AbstractTexture::subImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, Image<dimensions>& image) {
-    createIfNotAlready();
-
+    /* Reallocate only if needed */
     const Math::Vector<dimensions, Int> size = range.size();
     const std::size_t dataSize = Magnum::Implementation::imageDataSizeFor(image, size);
-    const Vector3i paddedOffset = Vector3i::pad<dimensions>(range.min());
-    const Vector3i paddedSize = Vector3i::pad(size, 1);
-
-    /* Reallocate only if needed */
     Containers::Array<char> data{image.release()};
     if(data.size() < dataSize)
         data = Containers::Array<char>{dataSize};
 
-    Buffer::unbindInternal(Buffer::TargetHint::PixelPack);
-    Context::current().state().renderer->applyPixelStoragePack(image.storage());
-    glGetTextureSubImage(_id, level, paddedOffset.x(), paddedOffset.y(), paddedOffset.z(), paddedSize.x(), paddedSize.y(), paddedSize.z(), GLenum(pixelFormat(image.format())), GLenum(pixelType(image.format(), image.formatExtra())), data.size(), data);
     image = Image<dimensions>{image.storage(), image.format(), image.formatExtra(), image.pixelSize(), size, std::move(data)};
+    subImage(level, range, BasicMutableImageView<dimensions>(image));
 }
 
 template void MAGNUM_GL_EXPORT AbstractTexture::subImage<1>(GLint, const Range1Di&, Image<1>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::subImage<2>(GLint, const Range2Di&, Image<2>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::subImage<3>(GLint, const Range3Di&, Image<3>&);
+
+template<UnsignedInt dimensions> void AbstractTexture::subImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, const BasicMutableImageView<dimensions>& image) {
+    CORRADE_ASSERT(image.data().data() != nullptr || !(Math::Vector<dimensions, Int>(range.size()).product()),
+        "GL::AbstractTexture::subImage(): image view is nullptr", );
+    CORRADE_ASSERT(image.size() == range.size(),
+        "GL::AbstractTexture::subImage(): expected image view size" << range.size() << "but got" << image.size(), );
+
+    createIfNotAlready();
+
+    const Math::Vector<dimensions, Int> size = range.size();
+    const Vector3i paddedOffset = Vector3i::pad<dimensions>(range.min());
+    const Vector3i paddedSize = Vector3i::pad(size, 1);
+
+    Buffer::unbindInternal(Buffer::TargetHint::PixelPack);
+    Context::current().state().renderer->applyPixelStoragePack(image.storage());
+    glGetTextureSubImage(_id, level, paddedOffset.x(), paddedOffset.y(), paddedOffset.z(), paddedSize.x(), paddedSize.y(), paddedSize.z(), GLenum(pixelFormat(image.format())), GLenum(pixelType(image.format(), image.formatExtra())), image.data().size(), image.data());
+}
+
+template void MAGNUM_GL_EXPORT AbstractTexture::subImage<1>(GLint, const Range1Di&, const BasicMutableImageView<1>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::subImage<2>(GLint, const Range2Di&, const BasicMutableImageView<2>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::subImage<3>(GLint, const Range3Di&, const BasicMutableImageView<3>&);
 
 template<UnsignedInt dimensions> void AbstractTexture::subImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, BufferImage<dimensions>& image, const BufferUsage usage) {
     createIfNotAlready();
@@ -1773,6 +1961,48 @@ template<UnsignedInt dimensions> void AbstractTexture::compressedSubImage(const 
 template void MAGNUM_GL_EXPORT AbstractTexture::compressedSubImage<1>(GLint, const Range1Di&, CompressedImage<1>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::compressedSubImage<2>(GLint, const Range2Di&, CompressedImage<2>&);
 template void MAGNUM_GL_EXPORT AbstractTexture::compressedSubImage<3>(GLint, const Range3Di&, CompressedImage<3>&);
+
+template<UnsignedInt dimensions> void AbstractTexture::compressedSubImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, const BasicMutableCompressedImageView<dimensions>& image) {
+    #ifndef CORRADE_NO_ASSERT
+    CORRADE_ASSERT(image.data().data() != nullptr || !(Math::Vector<dimensions, Int>(range.size()).product()),
+        "GL::AbstractTexture::compressedSubImage(): image view is nullptr", );
+    CORRADE_ASSERT(image.size() == range.size(),
+        "GL::AbstractTexture::compressedSubImage(): expected image view size" << range.size() << "but got" << image.size(), );
+
+    createIfNotAlready();
+
+    const Math::Vector<dimensions, Int> size = range.size();
+
+    /* Internal texture format */
+    GLint format;
+    (this->*Context::current().state().texture->getLevelParameterivImplementation)(level, GL_TEXTURE_INTERNAL_FORMAT, &format);
+
+    CORRADE_ASSERT(compressedPixelFormat(image.format()) == CompressedPixelFormat(format),
+        "GL::AbstractTexture::compressedSubImage(): expected image view format" << CompressedPixelFormat(format) << "but got" << compressedPixelFormat(image.format()), );
+
+    /* Calculate compressed subimage size. If the user-provided pixel storage
+       doesn't tell us all properties about the compression, we need to ask GL
+       for it. That requires GL_ARB_internalformat_query2. */
+    std::size_t dataSize;
+    if(!image.storage().compressedBlockSize().product() || !image.storage().compressedBlockDataSize())
+        dataSize = compressedSubImageSize<dimensions>(TextureFormat(format), size);
+    else dataSize = Magnum::Implementation::compressedImageDataSizeFor(image, size);
+
+    CORRADE_ASSERT(image.data().size() == dataSize,
+        "GL::AbstractTexture::compressedSubImage(): expected image view data size" << dataSize << "bytes but got" << image.data().size(), );
+    #endif
+
+    const Vector3i paddedOffset = Vector3i::pad<dimensions>(range.min());
+    const Vector3i paddedSize = Vector3i::pad(size, 1);
+
+    Buffer::unbindInternal(Buffer::TargetHint::PixelPack);
+    Context::current().state().renderer->applyPixelStoragePack(image.storage());
+    glGetCompressedTextureSubImage(_id, level, paddedOffset.x(), paddedOffset.y(), paddedOffset.z(), paddedSize.x(), paddedSize.y(), paddedSize.z(), image.data().size(), image.data());
+}
+
+template void MAGNUM_GL_EXPORT AbstractTexture::compressedSubImage<1>(GLint, const Range1Di&, const BasicMutableCompressedImageView<1>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::compressedSubImage<2>(GLint, const Range2Di&, const BasicMutableCompressedImageView<2>&);
+template void MAGNUM_GL_EXPORT AbstractTexture::compressedSubImage<3>(GLint, const Range3Di&, const BasicMutableCompressedImageView<3>&);
 
 template<UnsignedInt dimensions> void AbstractTexture::compressedSubImage(const GLint level, const RangeTypeFor<dimensions, Int>& range, CompressedBufferImage<dimensions>& image, const BufferUsage usage) {
     createIfNotAlready();

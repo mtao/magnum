@@ -388,7 +388,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
 
         #ifndef MAGNUM_TARGET_GLES2
         /**
-         * @brief Set minimum level-of-detail parameter
+         * @brief Set the minimum level-of-detail
          * @return Reference to self (for method chaining)
          *
          * Limits selection of highest resolution mipmap. If
@@ -409,7 +409,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         }
 
         /**
-         * @brief Set maximum level-of-detail parameter
+         * @brief Set the maximum level-of-detail
          * @return Reference to self (for method chaining)
          *
          * Limits selection of lowest resolution mipmap. If
@@ -724,7 +724,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
             return *this;
         }
 
-        #ifndef MAGNUM_TARGET_GLES2
+        #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
         /**
          * @brief Image size in given mip level
          *
@@ -748,14 +748,16 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
 
         #ifndef MAGNUM_TARGET_GLES
         /**
-         * @brief Read given mip level of texture to image
+         * @brief Read given texture mip level to an image
          * @param level             Mip level
          * @param image             Image where to put the data
          *
          * Image parameters like format and type of pixel data are taken from
          * given image, image size is taken from the texture using
-         * @ref imageSize().  The storage is not reallocated if it is large
-         * enough to contain the new data.
+         * @ref imageSize(). The storage is not reallocated if it is large
+         * enough to contain the new data --- however if you want to read into
+         * existing memory or *ensure* a reallocation does not happen, use
+         * @ref image(Int, const BasicMutableImageView<dimensions>&) instead.
          *
          * If @gl_extension{ARB,direct_state_access} (part of OpenGL 4.5) is
          * not available, the texture is bound before the operation (if not
@@ -786,7 +788,18 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         Image<dimensions> image(Int level, Image<dimensions>&& image);
 
         /**
-         * @brief Read given mip level of texture to buffer image
+         * @brief Read given texture mip level to an image view
+         *
+         * Compared to @ref image(Int, Image<dimensions>&) the function reads
+         * the pixels into the memory provided by @p image, expecting it's not
+         * @cpp nullptr @ce and its size is the same as size of given @p level.
+         */
+        void image(Int level, const BasicMutableImageView<dimensions>& image) {
+            AbstractTexture::image<dimensions>(level, image);
+        }
+
+        /**
+         * @brief Read given texture mip level to a buffer image
          * @param level             Mip level
          * @param image             Buffer image where to put the data
          * @param usage             Buffer usage
@@ -813,13 +826,16 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         BufferImage<dimensions> image(Int level, BufferImage<dimensions>&& image, BufferUsage usage);
 
         /**
-         * @brief Read given mip level of compressed texture to image
+         * @brief Read given compressed texture mip level to an image
          * @param level             Mip level
          * @param image             Image where to put the compressed data
          *
          * Compression format and data size are taken from the texture, image
          * size is taken using @ref imageSize(). The storage is not reallocated
-         * if it is large enough to contain the new data.
+         * if it is large enough to contain the new data --- however if you
+         * want to read into existing memory or *ensure* a reallocation does
+         * not happen, use @ref compressedImage(Int, const BasicMutableCompressedImageView<dimensions>&)
+         * instead.
          *
          * If @gl_extension{ARB,direct_state_access} (part of OpenGL 4.5) is
          * not available, the texture is bound before the operation (if not
@@ -854,7 +870,19 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         CompressedImage<dimensions> compressedImage(Int level, CompressedImage<dimensions>&& image);
 
         /**
-         * @brief Read given mip level of compressed texture to buffer image
+         * @brief Read given compressed texture mip level to an image view
+         *
+         * Compared to @ref compressedImage(Int, CompressedImage<dimensions>&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as size of given @p level.
+         */
+        void compressedImage(Int level, const BasicMutableCompressedImageView<dimensions>& image) {
+            AbstractTexture::compressedImage<dimensions>(level, image);
+        }
+
+        /**
+         * @brief Read given compressed texture mip level to a buffer image
          * @param level             Mip level
          * @param image             Buffer image where to put the compressed data
          * @param usage             Buffer usage
@@ -883,14 +911,17 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         CompressedBufferImage<dimensions> compressedImage(Int level, CompressedBufferImage<dimensions>&& image, BufferUsage usage);
 
         /**
-         * @brief Read range of given texture mip level to image
+         * @brief Read a range of given texture mip level to an image
          * @param level             Mip level
          * @param range             Range to read
          * @param image             Image where to put the data
          *
          * Image parameters like format and type of pixel data are taken from
          * given image. The storage is not reallocated if it is large enough to
-         * contain the new data.
+         * contain the new data --- however if you want to read into existing
+         * memory or *ensure* a reallocation does not happen, use
+         * @ref subImage(Int, const RangeTypeFor<dimensions, Int>&, const BasicMutableImageView<dimensions>&)
+         * instead.
          *
          * The operation is protected from buffer overflow.
          * @see @fn_gl_keyword{GetTextureSubImage}
@@ -911,7 +942,19 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         Image<dimensions> subImage(Int level, const RangeTypeFor<dimensions, Int>& range, Image<dimensions>&& image);
 
         /**
-         * @brief Read range of given texture mip level to buffer image
+         * @brief Read a range of given texture mip level to an image view
+         *
+         * Compared to @ref subImage(Int, const RangeTypeFor<dimensions, Int>&, Image<dimensions>&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce and its size is the same as
+         * @p range size.
+         */
+        void subImage(Int level, const RangeTypeFor<dimensions, Int>& range, const BasicMutableImageView<dimensions>& image) {
+            AbstractTexture::subImage<dimensions>(level, range, image);
+        }
+
+        /**
+         * @brief Read a range of given texture mip level to a buffer image
          * @param level             Mip level
          * @param range             Range to read
          * @param image             Buffer image where to put the data
@@ -938,12 +981,17 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         BufferImage<dimensions> subImage(Int level, const RangeTypeFor<dimensions, Int>& range, BufferImage<dimensions>&& image, BufferUsage usage);
 
         /**
-         * @brief Read range of given compressed texture mip level to image
+         * @brief Read a range of given compressed texture mip level to an image
          * @param level             Mip level
          * @param range             Range to read
          * @param image             Image where to put the compressed data
          *
-         * Compression format and data size are taken from the texture.
+         * Compression format and data size are taken from the texture. The
+         * storage is not reallocated if it is large enough to contain the new
+         * data --- however if you want to read into existing memory or
+         * *ensure* a reallocation does not happen, use
+         * @ref compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, const BasicMutableCompressedImageView<dimensions>&)
+         * instead.
          * @see @fn_gl2{GetTextureLevelParameter,GetTexLevelParameter},
          *      eventually @fn_gl{GetTexLevelParameter} with
          *      @def_gl{TEXTURE_INTERNAL_FORMAT}, then possibly
@@ -975,7 +1023,19 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
         CompressedImage<dimensions> compressedSubImage(Int level, const RangeTypeFor<dimensions, Int>& range, CompressedImage<dimensions>&& image);
 
         /**
-         * @brief Read range of given compressed texture mip level to buffer image
+         * @brief Read a range of given compressed texture mip level to an image view
+         *
+         * Compared to @ref compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage<dimensions>&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as @p range size.
+         */
+        void compressedSubImage(Int level, const RangeTypeFor<dimensions, Int>& range, const BasicMutableCompressedImageView<dimensions>& image) {
+            AbstractTexture::compressedSubImage<dimensions>(level, range, image);
+        }
+
+        /**
+         * @brief Read a range of given compressed texture mip level to a buffer image
          * @param level             Mip level
          * @param range             Range to read
          * @param image             Buffer image where to put the compressed data
@@ -1037,7 +1097,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
          * @deprecated_gl Prefer to use @ref setStorage() and @ref setSubImage()
          *      instead.
          */
-        Texture<dimensions>& setImage(Int level, TextureFormat internalFormat, const ImageView<dimensions>& image) {
+        Texture<dimensions>& setImage(Int level, TextureFormat internalFormat, const BasicImageView<dimensions>& image) {
             DataHelper<dimensions>::setImage(*this, level, internalFormat, image);
             return *this;
         }
@@ -1093,7 +1153,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
          * @deprecated_gl Prefer to use @ref setStorage() and
          *      @ref setCompressedSubImage() instead.
          */
-        Texture<dimensions>& setCompressedImage(Int level, const CompressedImageView<dimensions>& image) {
+        Texture<dimensions>& setCompressedImage(Int level, const BasicCompressedImageView<dimensions>& image) {
             DataHelper<dimensions>::setCompressedImage(*this, level, image);
             return *this;
         }
@@ -1167,7 +1227,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
          *      able to use @ref setStorage() as it uses implicit @ref PixelType
          *      value.
          */
-        Texture<dimensions>& setSubImage(Int level, const VectorTypeFor<dimensions, Int>& offset, const ImageView<dimensions>& image) {
+        Texture<dimensions>& setSubImage(Int level, const VectorTypeFor<dimensions, Int>& offset, const BasicImageView<dimensions>& image) {
             DataHelper<Dimensions>::setSubImage(*this, level, offset, image);
             return *this;
         }
@@ -1219,7 +1279,7 @@ template<UnsignedInt dimensions> class Texture: public AbstractTexture {
          * @requires_gl Non-default @ref CompressedPixelStorage is not
          *      available in OpenGL ES and WebGL.
          */
-        Texture<dimensions>& setCompressedSubImage(Int level, const VectorTypeFor<dimensions, Int>& offset, const CompressedImageView<dimensions>& image) {
+        Texture<dimensions>& setCompressedSubImage(Int level, const VectorTypeFor<dimensions, Int>& offset, const BasicCompressedImageView<dimensions>& image) {
             DataHelper<Dimensions>::setCompressedSubImage(*this, level, offset, image);
             return *this;
         }

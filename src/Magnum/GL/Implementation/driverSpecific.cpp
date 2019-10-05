@@ -105,6 +105,12 @@ namespace {
    possible to get driver version through EGL, so enabling this unconditionally
    on all EGL NV contexts. */
 "nv-egl-incorrect-gl11-function-pointers",
+
+/* NVidia is unhappy when EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE_BIT_KHR is
+   present among attributes passed to eglCreateContext(), blowing up with
+   EGL_BAD_MATCH. This flag is enabled by default, wiping it away to make the
+   context creation work. */
+"nv-egl-forward-compatible-context-unhappy",
 #endif
 
 #ifndef MAGNUM_TARGET_GLES
@@ -255,6 +261,12 @@ namespace {
    glGetNamedFramebufferParameter(). Using either glGetInteger() or
    glGetFramebufferParameter() works correctly. */
 "nv-implementation-color-read-format-dsa-broken",
+#endif
+
+#ifndef MAGNUM_TARGET_GLES
+/* ApiTrace needs an explicit initial glViewport() call to initialize its
+   framebuffer size, otherwise it assumes it's zero-sized. */
+"apitrace-zero-initial-viewport",
 #endif
 /* [workarounds] */
     };
@@ -431,6 +443,15 @@ void Context::setupDriverWorkarounds() {
     #endif
 
     #undef _setRequiredVersion
+
+    #ifndef MAGNUM_TARGET_GLES
+    if(isExtensionSupported<Extensions::GREMEDY::string_marker>() &&
+       !isDriverWorkaroundDisabled("apitrace-zero-initial-viewport")) {
+        GLint viewport[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    }
+    #endif
 }
 
 }}

@@ -317,18 +317,6 @@ class MAGNUM_GL_EXPORT AbstractTexture: public AbstractObject {
         /** @brief Move constructor */
         AbstractTexture(AbstractTexture&& other) noexcept;
 
-        /**
-         * @brief Destructor
-         *
-         * Deletes associated OpenGL texture.
-         * @see @ref BufferTexture::wrap(), @ref CubeMapTexture::wrap(),
-         *      @ref CubeMapTextureArray::wrap(),
-         *      @ref MultisampleTexture::wrap(), @ref RectangleTexture::wrap(),
-         *      @ref Texture::wrap(), @ref TextureArray::wrap(),
-         *      @ref release(), @fn_gl_keyword{DeleteTextures}
-         */
-        ~AbstractTexture();
-
         /** @brief Copying is not allowed */
         AbstractTexture& operator=(const AbstractTexture&) = delete;
 
@@ -408,6 +396,25 @@ class MAGNUM_GL_EXPORT AbstractTexture: public AbstractObject {
          *      @fn_gl_keyword{BindTexture}
          */
         void bind(Int textureUnit);
+
+    #if !defined(MAGNUM_BUILD_DEPRECATED) || defined(DOXYGEN_GENERATING_OUTPUT)
+    protected: /* Destructor was public before */
+    #endif
+        /**
+         * @brief Destructor
+         *
+         * Deletes associated OpenGL texture.
+         * @see @ref BufferTexture::wrap(), @ref CubeMapTexture::wrap(),
+         *      @ref CubeMapTextureArray::wrap(),
+         *      @ref MultisampleTexture::wrap(), @ref RectangleTexture::wrap(),
+         *      @ref Texture::wrap(), @ref TextureArray::wrap(),
+         *      @ref release(), @fn_gl_keyword{DeleteTextures}
+         */
+        /* Not virtual to avoid vtable overhead, however while subclasses are
+           all the same size (and thus no risk of memory leaks from additional
+           members) these might perform cleanup steps on destruction (driver
+           workarouds...), so we have to disallow deletion from base pointer */
+        ~AbstractTexture();
 
     #ifdef DOXYGEN_GENERATING_OUTPUT
     private:
@@ -489,12 +496,16 @@ class MAGNUM_GL_EXPORT AbstractTexture: public AbstractObject {
         void generateMipmap();
 
         #ifndef MAGNUM_TARGET_GLES
+        template<UnsignedInt dimensions> void image(GLint level, const BasicMutableImageView<dimensions>& image);
         template<UnsignedInt dimensions> void image(GLint level, Image<dimensions>& image);
         template<UnsignedInt dimensions> void image(GLint level, BufferImage<dimensions>& image, BufferUsage usage);
+        template<UnsignedInt dimensions> void compressedImage(GLint level, const BasicMutableCompressedImageView<dimensions>& image);
         template<UnsignedInt dimensions> void compressedImage(GLint level, CompressedImage<dimensions>& image);
         template<UnsignedInt dimensions> void compressedImage(GLint level, CompressedBufferImage<dimensions>& image, BufferUsage usage);
+        template<UnsignedInt dimensions> void subImage(GLint level, const RangeTypeFor<dimensions, Int>& range, const BasicMutableImageView<dimensions>& image);
         template<UnsignedInt dimensions> void subImage(GLint level, const RangeTypeFor<dimensions, Int>& range, Image<dimensions>& image);
         template<UnsignedInt dimensions> void subImage(GLint level, const RangeTypeFor<dimensions, Int>& range, BufferImage<dimensions>& image, BufferUsage usage);
+        template<UnsignedInt dimensions> void compressedSubImage(GLint level, const RangeTypeFor<dimensions, Int>& range, const BasicMutableCompressedImageView<dimensions>& image);
         template<UnsignedInt dimensions> void compressedSubImage(GLint level, const RangeTypeFor<dimensions, Int>& range, CompressedImage<dimensions>& image);
         template<UnsignedInt dimensions> void compressedSubImage(GLint level, const RangeTypeFor<dimensions, Int>& range, CompressedBufferImage<dimensions>& image, BufferUsage usage);
         #endif

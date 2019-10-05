@@ -48,13 +48,13 @@ namespace Magnum { namespace Math {
 template<class T> inline typename std::enable_if<IsScalar<T>::value, bool>::type isNan(T value) {
     return std::isnan(UnderlyingTypeOf<T>(value));
 }
-
-template<class T> constexpr typename std::enable_if<IsScalar<T>::value, T>::type min(T a, T b) {
-    return b < a ? b : a;
+/* Keeping the same parameter names as in Functions.h so the note about
+   NaN propagation works here too */
+template<class T> constexpr typename std::enable_if<IsScalar<T>::value, T>::type min(T value, T min) {
+    return min < value ? min : value;
 }
-
-template<class T> constexpr typename std::enable_if<IsScalar<T>::value, T>::type max(T a, T b) {
-    return a < b ? b : a;
+template<class T> constexpr typename std::enable_if<IsScalar<T>::value, T>::type max(T value, T max) {
+    return value < max ? max : value;
 }
 #endif
 
@@ -81,6 +81,10 @@ namespace Implementation {
 
     /* Used to make friends to speed up debug builds */
     template<std::size_t, class> struct MatrixDeterminant;
+    /* To make gather() / scatter() faster */
+    template<std::size_t, std::size_t> struct GatherComponentAt;
+    template<std::size_t, std::size_t, bool> struct ScatterComponentOr;
+    template<class T, std::size_t valueSize, char, char...> constexpr T scatterRecursive(const T&, const Vector<valueSize, typename T::Type>&, std::size_t);
 }
 
 /** @relatesalso Vector
@@ -237,7 +241,11 @@ template<std::size_t size, class T> class Vector {
         T& operator[](std::size_t pos) { return _data[pos]; }
         constexpr T operator[](std::size_t pos) const { return _data[pos]; } /**< @overload */
 
-        /** @brief Equality comparison */
+        /**
+         * @brief Equality comparison
+         *
+         * @see @ref Math::equal()
+         */
         bool operator==(const Vector<size, T>& other) const {
             for(std::size_t i = 0; i != size; ++i)
                 if(!TypeTraits<T>::equals(_data[i], other._data[i])) return false;
@@ -245,7 +253,11 @@ template<std::size_t size, class T> class Vector {
             return true;
         }
 
-        /** @brief Non-equality comparison */
+        /**
+         * @brief Non-equality comparison
+         *
+         * @see @ref Math::notEqual()
+         */
         bool operator!=(const Vector<size, T>& other) const {
             return !operator==(other);
         }
@@ -305,12 +317,17 @@ template<std::size_t size, class T> class Vector {
         /**
          * @brief Negated vector
          *
-         * @f[
+         * Enabled only for signed types. @f[
          *      \boldsymbol b_i = -\boldsymbol a_i
          * @f]
          * @see @ref Vector2::perpendicular()
          */
-        Vector<size, T> operator-() const;
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        Vector<size, T>
+        #else
+        template<class U = T> typename std::enable_if<std::is_signed<U>::value, Vector<size, T>>::type
+        #endif
+        operator-() const;
 
         /**
          * @brief Add and assign a vector
@@ -639,6 +656,15 @@ template<std::size_t size, class T> class Vector {
         template<std::size_t, std::size_t, class> friend class RectangularMatrix;
         template<std::size_t, class> friend class Matrix;
         template<std::size_t, class> friend struct Implementation::MatrixDeterminant;
+        /* To make gather() / scatter() faster */
+        template<std::size_t, std::size_t> friend struct Implementation::GatherComponentAt;
+        template<std::size_t, std::size_t, bool> friend struct Implementation::ScatterComponentOr;
+        template<class T_, std::size_t valueSize, char, char...> friend constexpr T_ Implementation::scatterRecursive(const T_&, const Vector<valueSize, typename T_::Type>&, std::size_t);
+
+        /* So the out-of-class comparators can access data directly to avoid
+           function call overhead */
+        template<std::size_t size_, class T_> friend BoolVector<size_> equal(const Vector<size_, T_>&, const Vector<size_, T_>&);
+        template<std::size_t size_, class T_> friend BoolVector<size_> notEqual(const Vector<size_, T_>&, const Vector<size_, T_>&);
 
         /* Implementation for Vector<size, T>::Vector(const Vector<size, U>&) */
         template<class U, std::size_t ...sequence> constexpr explicit Vector(Implementation::Sequence<sequence...>, const Vector<size, U>& vector) noexcept: _data{T(vector._data[sequence])...} {}
@@ -654,6 +680,36 @@ template<std::size_t size, class T> class Vector {
             return {_data[size - 1 - sequence]...};
         }
 };
+
+/** @relatesalso Vector
+@brief Component-wise equality comparison
+
+Unlike @ref Vector::operator==() returns a @ref BoolVector instead of a single
+value. Vector complement to @ref equal(T, T).
+*/
+template<std::size_t size, class T> inline BoolVector<size> equal(const Vector<size, T>& a, const Vector<size, T>& b) {
+    BoolVector<size> out;
+
+    for(std::size_t i = 0; i != size; ++i)
+        out.set(i, TypeTraits<T>::equals(a._data[i], b._data[i]));
+
+    return out;
+}
+
+/** @relatesalso Vector
+@brief Component-wise non-equality comparison
+
+Unlike @ref Vector::operator!=() returns a @ref BoolVector instead of a single
+value. Vector complement to @ref notEqual(T, T).
+*/
+template<std::size_t size, class T> inline BoolVector<size> notEqual(const Vector<size, T>& a, const Vector<size, T>& b) {
+    BoolVector<size> out;
+
+    for(std::size_t i = 0; i != size; ++i)
+        out.set(i, !TypeTraits<T>::equals(a._data[i], b._data[i]));
+
+    return out;
+}
 
 /** @relates Vector
 @brief Multiply a scalar with a vector
@@ -1181,7 +1237,8 @@ extern template MAGNUM_EXPORT Corrade::Utility::Debug& operator<<(Corrade::Utili
         return Math::Vector<size, T>::pad(a, value);                        \
     }                                                                       \
                                                                             \
-    Type<T> operator-() const {                                             \
+    template<class U = T> typename std::enable_if<std::is_signed<U>::value, Type<T>>::type \
+    operator-() const {                                                     \
         return Math::Vector<size, T>::operator-();                          \
     }                                                                       \
     Type<T>& operator+=(const Math::Vector<size, T>& other) {               \
@@ -1377,7 +1434,13 @@ template<std::size_t size, class T> inline BoolVector<size> Vector<size, T>::ope
     return out;
 }
 
-template<std::size_t size, class T> inline Vector<size, T> Vector<size, T>::operator-() const {
+template<std::size_t size, class T>
+#ifdef DOXYGEN_GENERATING_OUTPUT
+inline Vector<size, T>
+#else
+template<class U> inline typename std::enable_if<std::is_signed<U>::value, Vector<size, T>>::type
+#endif
+Vector<size, T>::operator-() const {
     Vector<size, T> out;
 
     for(std::size_t i = 0; i != size; ++i)

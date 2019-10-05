@@ -60,7 +60,7 @@ namespace Implementation {
             #elif !defined(MAGNUM_TARGET_WEBGL)
             144
             #else
-            32
+            48
             #endif
     };
 }
@@ -134,11 +134,15 @@ Arguments:
 -   `--magnum-disable-workarounds LIST` --- driver workarounds to disable (see
     @ref opengl-workarounds for detailed info) (environment:
     `MAGNUM_DISABLE_WORKAROUNDS`)
--   `--magnum-disable-extensions LIST` --- OpenGL extensions to disable
+-   `--magnum-disable-extensions LIST` --- API extensions to disable
     (environment: `MAGNUM_DISABLE_EXTENSIONS`)
 -   `--magnum-gpu-validation off|on` --- GPU validation using
     @gl_extension{KHR,debug}, if present (environment:
-    `MAGNUM_GPU_VALIDATION`) (default: `off`)
+    `MAGNUM_GPU_VALIDATION`) (default: `off`). This sets up @ref DebugOutput
+    callbacks and also causes
+    @ref Platform::Sdl2Application::GLConfiguration::Flag::Debug "GLConfiguration::Flag::Debug"
+    to be enabled for context creation for both windowed and windowless
+    applications on supported platforms
 -   `--magnum-log default|quiet|verbose` --- console logging
     (environment: `MAGNUM_LOG`) (default: `default`)
 
@@ -146,6 +150,36 @@ Note that all options are prefixed with `--magnum-` to avoid conflicts with
 options passed to the application itself. Options that don't have this prefix
 are completely ignored, see documentation of the
 @ref Utility-Arguments-delegating "Utility::Arguments" class for details.
+
+@section GL-Context-multithreading Thread safety
+
+If Corrade is compiled with @ref CORRADE_BUILD_MULTITHREADED (the default), the
+@ref hasCurrent() and @ref current() accessors are thread-local, matching the
+OpenGL context thread locality. This might cause some performance penalties ---
+if you are sure that you never need to have multiple independent thread-local
+Magnum context, build Corrade with the option disabled.
+
+@section GL-Context-multiple Using multiple OpenGL contexts
+
+By default, Magnum assumes you have one OpenGL context active at all times, and
+all state tracking is done by the @ref Context instance that's associated with
+it. When you are using multiple OpenGL contexts, each of them needs to have a
+corresponding @ref Context instance active at the same time, and you need to
+ensure you only access OpenGL objects that were created by the same context as
+is currently active.
+
+To prevent accidents in common cases, the @ref Context class expects that no
+other instance is active during its creation. In order to create additional
+instances for other OpenGL contexts, *first* you need to "unset" the current one
+with @ref makeCurrent() and *then* create another instance, which will then
+become implicitly active:
+
+@snippet MagnumGL-framebuffer.cpp Context-makeCurrent-nullptr
+
+Once all needed instances are created, switch between them right after making
+the underlying GL context current:
+
+@snippet MagnumGL-framebuffer.cpp Context-makeCurrent
 */
 class MAGNUM_GL_EXPORT Context {
     public:
@@ -160,7 +194,10 @@ class MAGNUM_GL_EXPORT Context {
          */
         enum class Flag: GLint {
             /**
-             * Debug context
+             * Debug context. Enabled automatically by @ref Platform windowed
+             * and windowless application implementations if the
+             * `--magnum-gpu-validation`
+             * @ref GL-Context-command-line "command-line option" is present.
              * @requires_gl43 Extension @gl_extension{KHR,debug}
              * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
              *      @gl_extension{KHR,debug}
@@ -311,7 +348,9 @@ class MAGNUM_GL_EXPORT Context {
         enum class DetectedDriver: UnsignedShort {
             #ifndef MAGNUM_TARGET_WEBGL
             /**
-             * Binary AMD desktop drivers on Windows and Linux
+             * Proprietary AMD desktop drivers on Windows and Linux. In
+             * contrast, AMDGPU Mesa drivers report as
+             * @ref DetectedDriver::Mesa instead.
              * @requires_gles Not detectable on WebGL, as browsers
              *      intentionally hide most of the driver information.
              */
@@ -339,7 +378,8 @@ class MAGNUM_GL_EXPORT Context {
             IntelWindows = 1 << 2,
 
             /**
-             * Mesa drivers on Windows and Linux. See also
+             * Mesa drivers on Windows and Linux. In particular, Intel, AMD
+             * and NVidia Mesa drivers match as this. See also
              * @ref DetectedDriver::Svga3D.
              * @requires_gles Not detectable on WebGL, as browsers
              *      intentionally hide most of the driver information.
@@ -347,7 +387,7 @@ class MAGNUM_GL_EXPORT Context {
             Mesa = 1 << 3,
 
             /**
-             * Binary NVidia drivers on Windows and Linux
+             * Proprietary NVidia drivers on Windows and Linux
              * @requires_gles Not detectable on WebGL, as browsers
              *      intentionally hide most of the driver information.
              */
@@ -396,7 +436,7 @@ class MAGNUM_GL_EXPORT Context {
         /**
          * @brief Whether there is any current context
          *
-         * If Magnum is built with @ref MAGNUM_BUILD_MULTITHREADED, current
+         * If Corrade is built with @ref CORRADE_BUILD_MULTITHREADED, current
          * context is thread-local instead of global (the default).
          * @see @ref current()
          */
@@ -405,12 +445,20 @@ class MAGNUM_GL_EXPORT Context {
         /**
          * @brief Current context
          *
-         * Expect that there is current context. If Magnum is built with
-         * @ref MAGNUM_BUILD_MULTITHREADED, current context is thread-local
+         * Expect that there is current context. If Corrade is built with
+         * @ref CORRADE_BUILD_MULTITHREADED, current context is thread-local
          * instead of global (the default).
          * @see @ref hasCurrent()
          */
         static Context& current();
+
+        /**
+         * @brief Make a context current
+         *
+         * To be used when you need to manage multiple OpenGL contexts. See
+         * @ref GL-Context-multiple for more information.
+         */
+        static void makeCurrent(Context* context);
 
         /** @brief Copying is not allowed */
         Context(const Context&) = delete;
@@ -664,12 +712,23 @@ class MAGNUM_GL_EXPORT Context {
     #ifdef DOXYGEN_GENERATING_OUTPUT
     private:
     #endif
+        /* Applications want an easy way to know if GPU validation is enabled */
+        enum class InternalFlag: UnsignedByte {
+            DisplayInitializationLog = 1 << 0,
+            DisplayVerboseInitializationLog = DisplayInitializationLog|(1 << 1),
+            GpuValidation = 1 << 2
+        };
+        typedef Containers::EnumSet<InternalFlag> InternalFlags;
+        CORRADE_ENUMSET_FRIEND_OPERATORS(InternalFlags)
+
         bool isDriverWorkaroundDisabled(const char* workaround);
         Implementation::State& state() { return *_state; }
 
         /* This function is called from MeshState constructor, which means the
            state() pointer is not ready yet so we have to pass it directly */
         MAGNUM_GL_LOCAL bool isCoreProfileInternal(Implementation::ContextState& state);
+
+        InternalFlags internalFlags() const { return _internalFlags; }
 
     #ifdef DOXYGEN_GENERATING_OUTPUT
     private:
@@ -689,13 +748,6 @@ class MAGNUM_GL_EXPORT Context {
         #ifndef DOXYGEN_GENERATING_OUTPUT /* https://bugzilla.gnome.org/show_bug.cgi?id=776986 */
         friend Implementation::ContextState;
         #endif
-
-        enum class InternalFlag: UnsignedByte {
-            DisplayInitializationLog = 1 << 0,
-            GpuValidation = 1 << 1
-        };
-        typedef Containers::EnumSet<InternalFlag> InternalFlags;
-        CORRADE_ENUMSET_FRIEND_OPERATORS(InternalFlags)
 
         void disableDriverWorkaround(const std::string& workaround);
 
@@ -732,7 +784,6 @@ CORRADE_ENUMSET_OPERATORS(Context::Flags)
 #endif
 CORRADE_ENUMSET_OPERATORS(Context::DetectedDrivers)
 CORRADE_ENUMSET_OPERATORS(Context::States)
-CORRADE_ENUMSET_OPERATORS(Context::InternalFlags)
 
 #ifndef MAGNUM_TARGET_WEBGL
 /** @debugoperatorclassenum{Context,Context::Flag} */

@@ -25,8 +25,10 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Corrade/Containers/Reference.h>
+#include <Corrade/TestSuite/Tester.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
 #include "Magnum/GL/AbstractShaderProgram.h"
 #include "Magnum/GL/Buffer.h"
@@ -57,9 +59,6 @@
 
 #ifndef MAGNUM_TARGET_WEBGL
 #include "Magnum/GL/DebugOutput.h"
-#ifndef CORRADE_TARGET_ANDROID
-#include "Magnum/GL/OpenGLTester.h"
-#endif
 #include "Magnum/GL/TimeQuery.h"
 #endif
 
@@ -313,11 +312,16 @@ MyShader& bindSpecularTexture(GL::Texture2D& texture) {
 /* [AbstractShaderProgram-textures] */
 
 /* [AbstractShaderProgram-xfb] */
-MyShader& setTransformFeedback(GL::TransformFeedback& feedback, GL::Buffer& positions, GL::Buffer& data) {
+MyShader& setTransformFeedback(GL::TransformFeedback& feedback,
+    GL::Buffer& positions, GL::Buffer& data)
+{
     feedback.attachBuffers(0, {&positions, &data});
     return *this;
 }
-MyShader& setTransformFeedback(GL::TransformFeedback& feedback, Int totalCount, GL::Buffer& positions, GLintptr positionsOffset, GL::Buffer& data, GLintptr dataOffset) {
+MyShader& setTransformFeedback(GL::TransformFeedback& feedback, Int totalCount,
+    GL::Buffer& positions, GLintptr positionsOffset, GL::Buffer& data,
+    GLintptr dataOffset)
+{
     feedback.attachBuffers(0, {
         std::make_tuple(&positions, positionsOffset, totalCount*sizeof(Vector3)),
         std::make_tuple(&data, dataOffset, totalCount*sizeof(Vector2ui))
@@ -344,8 +348,8 @@ bindAttributeLocation(Position::Location, "position");
 bindAttributeLocation(Normal::Location, "normal");
 bindAttributeLocation(TextureCoordinates::Location, "textureCoordinates");
 
-bindFragmentDataLocationIndexed(ColorOutput, 0, "color");
-bindFragmentDataLocationIndexed(NormalOutput, 1, "normal");
+bindFragmentDataLocation(ColorOutput, "color");
+bindFragmentDataLocation(NormalOutput, "normal");
 
 // Link...
 /* [AbstractShaderProgram-binding] */
@@ -807,10 +811,12 @@ GL::DebugOutput::setEnabled(
     GL::DebugOutput::Source::Api, GL::DebugOutput::Type::Other, {131185}, false);
 
 {
-    GL::DebugGroup group{GL::DebugGroup::Source::Application, 42, "Scene rendering"};
+    GL::DebugGroup group{GL::DebugGroup::Source::Application, 42,
+        "Scene rendering"};
 
-    GL::DebugMessage::insert(GL::DebugMessage::Source::Application, GL::DebugMessage::Type::Marker,
-        1337, GL::DebugOutput::Severity::Notification, "Rendering transparent mesh");
+    GL::DebugMessage::insert(GL::DebugMessage::Source::Application,
+        GL::DebugMessage::Type::Marker, 1337,
+        GL::DebugOutput::Severity::Notification, "Rendering a transparent mesh");
 
     GL::Renderer::enable(GL::Renderer::Feature::Blending);
     mesh.draw(shader);
@@ -1134,7 +1140,6 @@ texture.setStorage(16, GL::TextureFormat::RGBA8, {1024, 1024});
 }
 #endif
 
-#if !defined(MAGNUM_TARGET_WEBGL) && !defined(CORRADE_TARGET_ANDROID)
 struct A: TestSuite::Tester {
 void foo() {
 /* [OpenGLTester-MAGNUM_VERIFY_NO_GL_ERROR] */
@@ -1142,7 +1147,6 @@ CORRADE_COMPARE(Magnum::GL::Renderer::error(), Magnum::GL::Renderer::Error::NoEr
 /* [OpenGLTester-MAGNUM_VERIFY_NO_GL_ERROR] */
 }
 };
-#endif
 
 #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
 {

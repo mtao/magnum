@@ -104,21 +104,26 @@ if(NOT MAGNUM_TARGET_GLES)
 endif()
 
 if(BUILD_GL_TESTS)
-    corrade_add_test(GLAbstractTextureGLTest AbstractTextureGLTest.cpp LIBRARIES MagnumOpenGLTester)
+    corrade_add_test(GLAbstractTextureGLTest AbstractTextureGLTest.cpp LIBRARIES MagnumOpenGLTesterTestLib)
     corrade_add_test(GLBufferGLTest BufferGLTest.cpp LIBRARIES MagnumOpenGLTester)
-    corrade_add_test(GLContextGLTest ContextGLTest.cpp LIBRARIES MagnumOpenGLTester)
-    corrade_add_test(GLCubeMapTextureGLTest CubeMapTextureGLTest.cpp LIBRARIES MagnumOpenGLTester)
-    corrade_add_test(GLFramebufferGLTest FramebufferGLTest.cpp LIBRARIES MagnumOpenGLTester)
+    corrade_add_test(GLCubeMapTextureGLTest CubeMapTextureGLTest.cpp LIBRARIES MagnumOpenGLTesterTestLib)
+    corrade_add_test(GLFramebufferGLTest FramebufferGLTest.cpp LIBRARIES MagnumOpenGLTesterTestLib)
     corrade_add_test(GLMeshGLTest MeshGLTest.cpp LIBRARIES MagnumOpenGLTesterTestLib)
     corrade_add_test(GLRendererGLTest RendererGLTest.cpp LIBRARIES MagnumOpenGLTester)
     corrade_add_test(GLRenderbufferGLTest RenderbufferGLTest.cpp LIBRARIES MagnumOpenGLTester)
-    corrade_add_test(GLTextureGLTest TextureGLTest.cpp LIBRARIES MagnumOpenGLTester)
+    corrade_add_test(GLTextureGLTest TextureGLTest.cpp LIBRARIES MagnumOpenGLTesterTestLib)
 
     corrade_add_resource(GLAbstractShaderProgramGLTest_RES AbstractShaderProgramGLTestFiles/resources.conf)
     corrade_add_test(GLAbstractShaderProgramGLTest
         AbstractShaderProgramGLTest.cpp
         ${GLAbstractShaderProgramGLTest_RES}
         LIBRARIES MagnumOpenGLTester)
+
+    corrade_add_test(GLContextGLTest ContextGLTest.cpp LIBRARIES MagnumOpenGLTester)
+    if(NOT CORRADE_TARGET_EMSCRIPTEN)
+        find_package(Threads REQUIRED)
+        target_link_libraries(GLContextGLTest PRIVATE Threads::Threads)
+    endif()
 
     if(CORRADE_TARGET_EMSCRIPTEN OR CORRADE_TARGET_ANDROID)
         set(SHADERGLTEST_FILES_DIR "ShaderGLTestFiles")
@@ -202,5 +207,19 @@ if(BUILD_GL_TESTS)
     if(NOT MAGNUM_TARGET_GLES)
         corrade_add_test(GLRectangleTextureGLTest RectangleTextureGLTest.cpp LIBRARIES MagnumOpenGLTester)
         set_target_properties(GLRectangleTextureGLTest PROPERTIES FOLDER "Magnum/GL/Test")
+    endif()
+
+    if(MAGNUM_BUILD_STATIC AND NOT CORRADE_TARGET_EMSCRIPTEN AND NOT CORRADE_TARGET_IOS AND NOT CORRADE_TARGET_ANDROID AND NOT CORRADE_TARGET_WINDOWS_RT)
+        add_library(GLGlobalStateAcrossLibrariesLibrary SHARED
+            GlobalStateAcrossLibrariesLibrary.cpp)
+        target_link_libraries(GLGlobalStateAcrossLibrariesLibrary PUBLIC MagnumGL)
+
+        corrade_add_test(GLGlobalStateAcrossLibrariesGLTest
+            GlobalStateAcrossLibrariesGLTest.cpp
+            LIBRARIES GLGlobalStateAcrossLibrariesLibrary MagnumOpenGLTester)
+        set_target_properties(
+            GLGlobalStateAcrossLibrariesLibrary
+            GLGlobalStateAcrossLibrariesGLTest
+            PROPERTIES FOLDER "Magnum/GL/Test")
     endif()
 endif()

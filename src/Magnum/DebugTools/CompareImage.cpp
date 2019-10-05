@@ -27,15 +27,20 @@
 
 #include <map>
 #include <sstream>
+#include <Corrade/Containers/Array.h>
+#include <Corrade/Containers/StridedArrayView.h>
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/PluginManager/Manager.h>
+#include <Corrade/TestSuite/Comparator.h>
 #include <Corrade/Utility/DebugStl.h>
+#include <Corrade/Utility/Directory.h>
 
 #include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
 #include "Magnum/Math/Functions.h"
 #include "Magnum/Math/Color.h"
 #include "Magnum/Math/Algorithms/KahanSum.h"
+#include "Magnum/Trade/AbstractImageConverter.h"
 #include "Magnum/Trade/AbstractImporter.h"
 #include "Magnum/Trade/ImageData.h"
 
@@ -43,34 +48,41 @@ namespace Magnum { namespace DebugTools { namespace Implementation {
 
 namespace {
 
-template<std::size_t size, class T> Math::Vector<size, T> pixelAt(const char* const pixels, const std::size_t stride, const Vector2i& pos) {
-    return reinterpret_cast<const Math::Vector<size, T>*>(pixels + stride*pos.y())[pos.x()];
-}
-
-template<std::size_t size, class T> Float calculateImageDelta(const ImageView2D& actual, const ImageView2D& expected, Containers::ArrayView<Float> output) {
-    CORRADE_INTERNAL_ASSERT(output.size() == std::size_t(expected.size().product()));
-
-    /* Precalculate parameters for pixel access */
-    Math::Vector2<std::size_t> dataOffset, dataSize;
-
-    std::tie(dataOffset, dataSize) = actual.dataProperties();
-    const char* const actualPixels = actual.data() + dataOffset.sum();
-    const std::size_t actualStride = dataSize.x();
-
-    std::tie(dataOffset, dataSize) = expected.dataProperties();
-    const char* const expectedPixels = expected.data() + dataOffset.sum();
-    const std::size_t expectedStride = dataSize.x();
+template<std::size_t size, class T> Float calculateImageDelta(const Containers::StridedArrayView2D<const Math::Vector<size, T>>& actual, const Containers::StridedArrayView2D<const Math::Vector<size, T>>& expected, const Containers::StridedArrayView2D<Float>& output) {
+    CORRADE_INTERNAL_ASSERT(actual.size() == output.size());
+    CORRADE_INTERNAL_ASSERT(output.size() == expected.size());
 
     /* Calculate deltas and maximal value of them */
     Float max{};
-    for(std::int_fast32_t y = 0; y != expected.size().y(); ++y) {
-        for(std::int_fast32_t x = 0; x != expected.size().x(); ++x) {
-            Math::Vector<size, Float> actualPixel{pixelAt<size, T>(actualPixels, actualStride, {Int(x), Int(y)})};
-            Math::Vector<size, Float> expectedPixel{pixelAt<size, T>(expectedPixels, expectedStride, {Int(x), Int(y)})};
+    for(std::size_t i = 0, iMax = expected.size()[0]; i != iMax; ++i) {
+        Containers::StridedArrayView1D<const Math::Vector<size, T>> actualRow = actual[i];
+        Containers::StridedArrayView1D<const Math::Vector<size, T>> expectedRow = expected[i];
+        Containers::StridedArrayView1D<Float> outputRow = output[i];
 
-            const Float value = (Math::abs(actualPixel - expectedPixel)).sum()/size;
-            output[y*expected.size().x() + x] = value;
-            max = Math::max(max, value);
+        for(std::size_t j = 0, jMax = expectedRow.size(); j != jMax; ++j) {
+            /* Explicitly convert from T to Float */
+            auto actualPixel = Math::Vector<size, Float>(actualRow[j]);
+            auto expectedPixel = Math::Vector<size, Float>(expectedRow[j]);
+
+            /* First calculate a classic difference */
+            Math::Vector<size, Float> diff = Math::abs(actualPixel - expectedPixel);
+
+            /* Mark pixels that are NaN in both actual and expected pixels as
+               having no difference */
+            diff = Math::lerp(diff, {}, Math::isNan(actualPixel) & Math::isNan(expectedPixel));
+
+            /* Then also mark pixels that are the same sign of infnity in both
+               actual and expected pixel as having no difference */
+            diff = Math::lerp(diff, {}, Math::isInf(actualPixel) & Math::isInf(expectedPixel) & Math::equal(actualPixel, expectedPixel));
+
+            /* Calculate the difference and save it to the output image even
+               with NaN and ±Inf (as the user should know) */
+            outputRow[j] = diff.sum()/size;
+
+            /* On the other hand, infs and NaNs should not contribute to the
+               max delta -- because all other differences would be zero
+               compared to them */
+            max = Math::max(max, Math::lerp(diff, {}, Math::isNan(diff)|Math::isInf(diff)).sum()/size);
         }
     }
 
@@ -79,29 +91,49 @@ template<std::size_t size, class T> Float calculateImageDelta(const ImageView2D&
 
 }
 
-std::tuple<Containers::Array<Float>, Float, Float> calculateImageDelta(const ImageView2D& actual, const ImageView2D& expected) {
+std::tuple<Containers::Array<Float>, Float, Float> calculateImageDelta(const PixelFormat actualFormat, const Containers::StridedArrayView3D<const char>& actualPixels, const ImageView2D& expected) {
     /* Calculate a delta image */
-    Containers::Array<Float> delta{Containers::NoInit, std::size_t(expected.size().product())};
+    Containers::Array<Float> deltaData{Containers::NoInit,
+        std::size_t(expected.size().product())};
+    Containers::StridedArrayView2D<Float> delta{deltaData,
+        {std::size_t(expected.size().y()), std::size_t(expected.size().x())}};
 
+    CORRADE_INTERNAL_ASSERT(actualFormat == expected.format());
     CORRADE_ASSERT(!isPixelFormatImplementationSpecific(expected.format()),
         "DebugTools::CompareImage: can't compare implementation-specific pixel formats", {});
 
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic error "-Wswitch"
+    #endif
     Float max{Constants::nan()};
     switch(expected.format()) {
         #define _c(format, size, T)                                         \
             case PixelFormat::format:                                       \
-                max = calculateImageDelta<size, T>(actual, expected, delta); \
+                max = calculateImageDelta<size, T>(                         \
+                    Containers::arrayCast<2, const Math::Vector<size, T>>(actualPixels), \
+                    expected.pixels<Math::Vector<size, T>>(), delta);       \
                 break;
         #define _d(first, second, size, T)                                  \
             case PixelFormat::first:                                        \
             case PixelFormat::second:                                       \
-                max = calculateImageDelta<size, T>(actual, expected, delta); \
+                max = calculateImageDelta<size, T>(                         \
+                    Containers::arrayCast<2, const Math::Vector<size, T>>(actualPixels), \
+                    expected.pixels<Math::Vector<size, T>>(), delta);       \
+                break;
+        #define _e(first, second, third, size, T)                           \
+            case PixelFormat::first:                                        \
+            case PixelFormat::second:                                       \
+            case PixelFormat::third:                                        \
+                max = calculateImageDelta<size, T>(                         \
+                    Containers::arrayCast<2, const Math::Vector<size, T>>(actualPixels), \
+                    expected.pixels<Math::Vector<size, T>>(), delta);       \
                 break;
         /* LCOV_EXCL_START */
-        _d(R8Unorm, R8UI, 1, UnsignedByte)
-        _d(RG8Unorm, RG8UI, 2, UnsignedByte)
-        _d(RGB8Unorm, RGB8UI, 3, UnsignedByte)
-        _d(RGBA8Unorm, RGBA8UI, 4, UnsignedByte)
+        _e(R8Unorm, R8Srgb, R8UI, 1, UnsignedByte)
+        _e(RG8Unorm, RG8Srgb, RG8UI, 2, UnsignedByte)
+        _e(RGB8Unorm, RGB8Srgb, RGB8UI, 3, UnsignedByte)
+        _e(RGBA8Unorm, RGBA8Srgb, RGBA8UI, 4, UnsignedByte)
         _d(R8Snorm, R8I, 1, Byte)
         _d(RG8Snorm, RG8I, 2, Byte)
         _d(RGB8Snorm, RGB8I, 3, Byte)
@@ -127,6 +159,7 @@ std::tuple<Containers::Array<Float>, Float, Float> calculateImageDelta(const Ima
         _c(RGB32F, 3, Float)
         _c(RGBA32F, 4, Float)
         /* LCOV_EXCL_STOP */
+        #undef _e
         #undef _d
         #undef _c
 
@@ -137,21 +170,28 @@ std::tuple<Containers::Array<Float>, Float, Float> calculateImageDelta(const Ima
             CORRADE_ASSERT(false,
                 "DebugTools::CompareImage: half-float formats are not supported yet", {});
     }
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
 
     CORRADE_ASSERT(max == max,
         "DebugTools::CompareImage: unknown format" << expected.format(), {});
 
     /* Calculate mean delta. Do it the special way so we don't lose
-       precision -- that would result in having false negatives! */
-    const Float mean = Math::Algorithms::kahanSum(delta.begin(), delta.end())/delta.size();
+       precision -- that would result in having false negatives! This
+       *deliberately* leaves specials in. The `max` has them already filtered
+       out so if this would filter them out as well, there would be nothing
+       left that could cause the comparison to fail. */
+    const Float mean = Math::Algorithms::kahanSum(deltaData.begin(), deltaData.end())/deltaData.size();
 
-    return std::make_tuple(std::move(delta), max, mean);
+    return std::make_tuple(std::move(deltaData), max, mean);
 }
 
 namespace {
     /* Done by printing an white to black gradient using one of the online
        ASCII converters. Yes, I'm lazy. Another one could be " .,:;ox%#@". */
-    const char Characters[] = " .,:~=+?7IZ$08DNM";
+    constexpr char CharacterData[] = " .,:~=+?7IZ$08DNM";
+    constexpr Containers::ArrayView<const char> Characters{CharacterData, sizeof(CharacterData) - 1};
 }
 
 void printDeltaImage(Debug& out, Containers::ArrayView<const Float> deltas, const Vector2i& size, const Float max, const Float maxThreshold, const Float meanThreshold) {
@@ -163,19 +203,28 @@ void printDeltaImage(Debug& out, Containers::ArrayView<const Float> deltas, cons
     const Vector2i blockCount = (size + pixelsPerBlock - Vector2i{1})/pixelsPerBlock;
 
     for(std::int_fast32_t y = 0; y != blockCount.y(); ++y) {
+        if(y) out << Debug::newline;
         out << "          |";
 
         for(std::int_fast32_t x = 0; x != blockCount.x(); ++x) {
-            /* Going bottom-up so we don't flip the image upside down when printing */
+            /* Going bottom-up so we don't flip the image upside down when
+               printing */
             const Vector2i offset = Vector2i{Int(x), blockCount.y() - Int(y) - 1}*pixelsPerBlock;
             const Vector2i blockSize = Math::min(size - offset, Vector2i{pixelsPerBlock});
 
             Float blockMax{};
-            for(std::int_fast32_t yb = 0; yb != blockSize.y(); ++yb)
-                for(std::int_fast32_t xb = 0; xb != blockSize.x(); ++xb)
-                    blockMax = Math::max(blockMax, deltas[(offset.y() + yb)*size.x() + offset.x() + xb]);
+            for(std::int_fast32_t yb = 0; yb != blockSize.y(); ++yb) {
+                for(std::int_fast32_t xb = 0; xb != blockSize.x(); ++xb) {
+                    /* Propagating NaNs. The delta should never be negative --
+                       but we need to test inversely in order to work correctly
+                       for NaNs. */
+                    const Float delta = deltas[(offset.y() + yb)*size.x() + offset.x() + xb];
+                    CORRADE_INTERNAL_ASSERT(!(delta < 0.0f));
+                    blockMax = Math::max(delta, blockMax);
+                }
+            }
 
-            const char c = Characters[Int(Math::round(Math::min(blockMax/max, 1.0f)*(sizeof(Characters) - 2)))];
+            const char c = Math::isNan(blockMax) ? Characters.back() : Characters[Int(Math::round(Math::min(1.0f, blockMax/max)*(Characters.size() - 1)))];
 
             if(blockMax > maxThreshold)
                 out << Debug::boldColor(Debug::Color::Red) << Debug::nospace << std::string{c} << Debug::resetColor;
@@ -184,29 +233,41 @@ void printDeltaImage(Debug& out, Containers::ArrayView<const Float> deltas, cons
             else out << Debug::nospace << std::string{c};
         }
 
-        out << Debug::nospace << "|" << Debug::newline;
+        out << Debug::nospace << "|";
     }
 }
 
 namespace {
 
-void printPixelAt(Debug& out, const char* const pixels, const std::size_t stride, const Vector2i& pos, const PixelFormat format) {
+void printPixelAt(Debug& out, const Containers::StridedArrayView3D<const char>& pixels, const Vector2i& pos, const PixelFormat format) {
+    const char* const pixel = &pixels[pos.y()][pos.x()][0];
+
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic error "-Wswitch"
+    #endif
     switch(format) {
         #define _c(format, size, T)                                         \
             case PixelFormat::format:                                       \
-                out << pixelAt<size, T>(pixels, stride, pos);               \
+                out << *reinterpret_cast<const Math::Vector<size, T>*>(pixel); \
                 break;
         #define _d(first, second, size, T)                                  \
             case PixelFormat::first:                                        \
             case PixelFormat::second:                                       \
-                out << pixelAt<size, T>(pixels, stride, pos);               \
+                out << *reinterpret_cast<const Math::Vector<size, T>*>(pixel); \
+                break;
+        #define _e(first, second, third, size, T)                           \
+            case PixelFormat::first:                                        \
+            case PixelFormat::second:                                       \
+            case PixelFormat::third:                                       \
+                out << *reinterpret_cast<const Math::Vector<size, T>*>(pixel); \
                 break;
         /* LCOV_EXCL_START */
-        _d(R8Unorm, R8UI, 1, UnsignedByte)
-        _d(RG8Unorm, RG8UI, 2, UnsignedByte)
+        _e(R8Unorm, R8Srgb, R8UI, 1, UnsignedByte)
+        _e(RG8Unorm, RG8Srgb, RG8UI, 2, UnsignedByte)
         _c(RGB8UI, 3, UnsignedByte)
         _c(RGBA8UI, 4, UnsignedByte)
-        /* RGB8Unorm, RGBA8Unorm handled below */
+        /* RGB8Unorm, RGBA8Unorm, RGB8Srgb, RGBA8Srgb handled below */
         _d(R8Snorm, R8I, 1, Byte)
         _d(RG8Snorm, RG8I, 2, Byte)
         _d(RGB8Snorm, RGB8I, 3, Byte)
@@ -232,15 +293,18 @@ void printPixelAt(Debug& out, const char* const pixels, const std::size_t stride
         _c(RGB32F, 3, Float)
         _c(RGBA32F, 4, Float)
         /* LCOV_EXCL_STOP */
+        #undef _e
         #undef _d
         #undef _c
 
         /* Take the opportunity and print 8-bit colors in hex */
         case PixelFormat::RGB8Unorm:
-            out << Color3ub{pixelAt<3, UnsignedByte>(pixels, stride, pos)};
+        case PixelFormat::RGB8Srgb:
+            out << *reinterpret_cast<const Color3ub*>(pixel);
             break;
         case PixelFormat::RGBA8Unorm:
-            out << Color4ub{pixelAt<4, UnsignedByte>(pixels, stride, pos)};
+        case PixelFormat::RGBA8Srgb:
+            out << *reinterpret_cast<const Color4ub*>(pixel);
             break;
 
         case PixelFormat::R16F:
@@ -250,29 +314,28 @@ void printPixelAt(Debug& out, const char* const pixels, const std::size_t stride
             /* Already handled by a printing assert before */
             CORRADE_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
     }
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
 }
 
 }
 
-void printPixelDeltas(Debug& out, Containers::ArrayView<const Float> delta, const ImageView2D& actual, const ImageView2D& expected, const Float maxThreshold, const Float meanThreshold, std::size_t maxCount) {
-    /* Precalculate parameters for pixel access */
-    Math::Vector2<std::size_t> offset, size;
-
-    std::tie(offset, size) = actual.dataProperties();
-    const char* const actualPixels = actual.data() + offset.sum();
-    const std::size_t actualStride = size.x();
-
-    std::tie(offset, size) = expected.dataProperties();
-    const char* const expectedPixels = expected.data() + offset.sum();
-    const std::size_t expectedStride = size.x();
-
+void printPixelDeltas(Debug& out, Containers::ArrayView<const Float> delta, PixelFormat format, const Containers::StridedArrayView3D<const char>& actualPixels, const Containers::StridedArrayView3D<const char>& expectedPixels, const Float maxThreshold, const Float meanThreshold, std::size_t maxCount) {
     /* Find first maxCount values above mean threshold and put them into a
-       sorted map */
+       sorted map. Need to reverse the condition in order to catch NaNs. */
     std::multimap<Float, std::size_t> large;
     for(std::size_t i = 0; i != delta.size(); ++i)
-        if(delta[i] > meanThreshold) large.emplace(delta[i], i);
+        if(!(delta[i] <= meanThreshold)) large.emplace(delta[i], i);
 
-    CORRADE_INTERNAL_ASSERT(!large.empty());
+    /* If there's no outliers, don't print anything. This can happen only when
+       --verbose is used. */
+    if(large.empty()) return;
+
+    /* If there are outliers, adding a newline to separate itself from the
+       delta image -- calling code wouldn't know if we produce output or not,
+       so it can't do that on its own. */
+    out << Debug::newline;
 
     if(large.size() > maxCount)
         out << "        Top" << maxCount << "out of" << large.size() << "pixels above max/mean threshold:";
@@ -286,16 +349,16 @@ void printPixelDeltas(Debug& out, Containers::ArrayView<const Float> delta, cons
         if(++count > maxCount) break;
 
         Vector2i pos;
-        std::tie(pos.y(), pos.x()) = Math::div(Int(it->second), expected.size().x());
+        std::tie(pos.y(), pos.x()) = Math::div(Int(it->second), Int(expectedPixels.size()[1]));
         out << Debug::newline << "          [" << Debug::nospace << pos.x()
             << Debug::nospace << "," << Debug::nospace << pos.y()
             << Debug::nospace << "]";
 
-        printPixelAt(out, actualPixels, actualStride, pos, expected.format());
+        printPixelAt(out, actualPixels, pos, format);
 
         out << Debug::nospace << ", expected";
 
-        printPixelAt(out, expectedPixels, expectedStride, pos, expected.format());
+        printPixelAt(out, expectedPixels, pos, format);
 
         out << "(Δ =" << Debug::boldColor(delta[it->second] > maxThreshold ?
             Debug::Color::Red : Debug::Color::Yellow) << delta[it->second]
@@ -303,7 +366,7 @@ void printPixelDeltas(Debug& out, Containers::ArrayView<const Float> delta, cons
     }
 }
 
-enum class ImageComparatorBase::State: UnsignedByte {
+enum class Result: UnsignedByte {
     PluginLoadFailed = 1,
     ActualImageLoadFailed,
     ExpectedImageLoadFailed,
@@ -313,204 +376,336 @@ enum class ImageComparatorBase::State: UnsignedByte {
     DifferentFormat,
     AboveThresholds,
     AboveMeanThreshold,
-    AboveMaxThreshold
+    AboveMaxThreshold,
+    VerboseMessage
 };
 
-class ImageComparatorBase::FileState {
+class ImageComparatorBase::State {
     public:
-        explicit FileState(PluginManager::Manager<Trade::AbstractImporter>& manager): manager{&manager} {}
+        explicit State(PluginManager::Manager<Trade::AbstractImporter>* importerManager, PluginManager::Manager<Trade::AbstractImageConverter>* converterManager, Float maxThreshold, Float meanThreshold): _importerManager{importerManager}, _converterManager{converterManager}, maxThreshold{maxThreshold}, meanThreshold{meanThreshold} {}
 
-        explicit FileState(): _privateManager{Containers::InPlaceInit}, manager{&*_privateManager} {}
+        /* Lazy-create the importer / converter if those weren't passed from
+           the outside. The importer might not be used at all if we are
+           comparing two image data (but in that case the FileState won't be
+           created at all); the converter will get used only very rarely for
+           the --save-failed option. Treat both the same lazy way to keep the
+           code straightforward. */
+        PluginManager::Manager<Trade::AbstractImporter>& importerManager() {
+            if(!_importerManager) _importerManager = &_privateImporterManager.emplace();
+            return *_importerManager;
+        }
+        PluginManager::Manager<Trade::AbstractImageConverter>& converterManager() {
+            if(!_converterManager) _converterManager = &_privateConverterManager.emplace();
+            return *_converterManager;
+        }
 
     private:
-        Containers::Optional<PluginManager::Manager<Trade::AbstractImporter>> _privateManager;
+        Containers::Optional<PluginManager::Manager<Trade::AbstractImporter>> _privateImporterManager;
+        Containers::Optional<PluginManager::Manager<Trade::AbstractImageConverter>> _privateConverterManager;
+        PluginManager::Manager<Trade::AbstractImporter>* _importerManager{};
+        PluginManager::Manager<Trade::AbstractImageConverter>* _converterManager{};
 
     public:
-        PluginManager::Manager<Trade::AbstractImporter>* manager;
         std::string actualFilename, expectedFilename;
         Containers::Optional<Trade::ImageData2D> actualImageData, expectedImageData;
-        /** @todo could at least the views have a NoCreate constructor? */
-        Containers::Optional<ImageView2D> actualImage, expectedImage;
+        PixelFormat actualFormat;
+        Containers::StridedArrayView3D<const char> actualPixels;
+        Containers::Optional<ImageView2D> expectedImage;
+
+        Float maxThreshold, meanThreshold;
+        Result result{};
+        Float max{}, mean{};
+        Containers::Array<Float> delta;
 };
 
-ImageComparatorBase::ImageComparatorBase(PluginManager::Manager<Trade::AbstractImporter>* manager, Float maxThreshold, Float meanThreshold): _maxThreshold{maxThreshold}, _meanThreshold{meanThreshold}, _max{}, _mean{} {
-    if(manager) _fileState.reset(new FileState{*manager});
-
+ImageComparatorBase::ImageComparatorBase(PluginManager::Manager<Trade::AbstractImporter>* importerManager, PluginManager::Manager<Trade::AbstractImageConverter>* converterManager, Float maxThreshold, Float meanThreshold): _state{Containers::InPlaceInit, importerManager, converterManager, maxThreshold, meanThreshold} {
+    CORRADE_ASSERT(!Math::isNan(maxThreshold) && !Math::isInf(maxThreshold) &&
+                   !Math::isNan(meanThreshold) && !Math::isInf(meanThreshold),
+        "DebugTools::CompareImage: thresholds can't be NaN or infinity", );
     CORRADE_ASSERT(meanThreshold <= maxThreshold,
         "DebugTools::CompareImage: maxThreshold can't be smaller than meanThreshold", );
 }
 
 ImageComparatorBase::~ImageComparatorBase() = default;
 
-bool ImageComparatorBase::operator()(const ImageView2D& actual, const ImageView2D& expected) {
-    _actualImage = &actual;
-    _expectedImage = &expected;
+TestSuite::ComparisonStatusFlags ImageComparatorBase::compare(const PixelFormat actualFormat, const Containers::StridedArrayView3D<const char>& actualPixels, const ImageView2D& expected) {
+    /* The reference can be pointing to the storage, don't call the assignment
+       on itself in that case */
+    if(&_state->actualPixels != &actualPixels) {
+        _state->actualFormat = actualFormat;
+        _state->actualPixels = actualPixels;
+    }
+    if(!_state->expectedImage || &*_state->expectedImage != &expected)
+        _state->expectedImage = expected;
 
     /* Verify that the images are the same */
-    if(actual.size() != expected.size()) {
-        _state = State::DifferentSize;
-        return false;
+    if(Vector2i{Int(actualPixels.size()[1]), Int(actualPixels.size()[0])} != expected.size()) {
+        _state->result = Result::DifferentSize;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
-    if(actual.format() != expected.format()) {
-        _state = State::DifferentFormat;
-        return false;
+    if(actualFormat != expected.format()) {
+        _state->result = Result::DifferentFormat;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
     Containers::Array<Float> delta;
-    std::tie(delta, _max, _mean) = DebugTools::Implementation::calculateImageDelta(actual, expected);
+    std::tie(delta, _state->max, _state->mean) = DebugTools::Implementation::calculateImageDelta(actualFormat, actualPixels, expected);
 
-    /* If both values are not above threshold, success */
-    if(_max > _maxThreshold && _mean > _meanThreshold)
-        _state = State::AboveThresholds;
-    else if(_max > _maxThreshold)
-        _state = State::AboveMaxThreshold;
-    else if(_mean > _meanThreshold)
-        _state = State::AboveMeanThreshold;
-    else return true;
+    /* Verify the max/mean is never below zero so we didn't mess up when
+       calculating specials. Note the inverted condition to catch NaNs in
+       _mean. The max should OTOH be never special as it would make all other
+       deltas become zero in comparison. */
+    CORRADE_INTERNAL_ASSERT(!(_state->mean < 0.0f));
+    CORRADE_INTERNAL_ASSERT(_state->max >= 0.0f && !Math::isInf(_state->max) && !Math::isNan(_state->max));
+
+    /* If both values are not above threshold, success. If the values are
+       above, save the delta. If the values are below thresholds but nonzero,
+       we can provide optional message -- save the delta in that case too. */
+    TestSuite::ComparisonStatusFlags flags = TestSuite::ComparisonStatusFlag::Failed;
+    if(_state->max > _state->maxThreshold && !(_state->mean <= _state->meanThreshold))
+        _state->result = Result::AboveThresholds;
+    else if(_state->max > _state->maxThreshold)
+        _state->result = Result::AboveMaxThreshold;
+    /* Comparing this way in order to propely catch NaNs in mean values */
+    else if(!(_state->mean <= _state->meanThreshold))
+        _state->result = Result::AboveMeanThreshold;
+    else if(_state->max > 0.0f || _state->mean > 0.0f) {
+        _state->result = Result::VerboseMessage;
+        flags = TestSuite::ComparisonStatusFlag::Verbose;
+    } else return TestSuite::ComparisonStatusFlags{};
 
     /* Otherwise save the deltas and fail */
-    _delta = std::move(delta);
-    return false;
+    _state->delta = std::move(delta);
+    return flags;
 }
 
-bool ImageComparatorBase::operator()(const std::string& actual, const std::string& expected) {
-    if(!_fileState) _fileState.reset(new FileState);
+TestSuite::ComparisonStatusFlags ImageComparatorBase::operator()(const ImageView2D& actual, const ImageView2D& expected) {
+    return compare(actual.format(), actual.pixels(), expected);
+}
 
-    _fileState->actualFilename = actual;
-    _fileState->expectedFilename = expected;
+TestSuite::ComparisonStatusFlags ImageComparatorBase::operator()(const std::string& actual, const std::string& expected) {
+    _state->actualFilename = actual;
+    _state->expectedFilename = expected;
 
     Containers::Pointer<Trade::AbstractImporter> importer;
-    if(!(importer = _fileState->manager->loadAndInstantiate("AnyImageImporter"))) {
-        _state = State::PluginLoadFailed;
-        return false;
+    /* Can't load importer plugin. While we *could* save diagnostic in this
+       case too, it would make no sense as it's a Schrödinger image at this
+       point -- we have no idea if it's the same or not until we open it. */
+    if(!(importer = _state->importerManager().loadAndInstantiate("AnyImageImporter"))) {
+        _state->result = Result::PluginLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    if(!importer->openFile(actual) || !(_fileState->actualImageData = importer->image2D(0))) {
-        _state = State::ActualImageLoadFailed;
-        return false;
+    /* Same here. We can't open the image for some reason (file missing? broken
+       plugin?), so can't know if it's the same or not. */
+    if(!importer->openFile(actual) || !(_state->actualImageData = importer->image2D(0))) {
+        _state->result = Result::ActualImageLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    if(!importer->openFile(expected) || !(_fileState->expectedImageData = importer->image2D(0))) {
-        _state = State::ExpectedImageLoadFailed;
-        return false;
+    /* If the actual data are compressed, we won't be able to compare them
+       (and probably neither save them back due to format mismatches). Don't
+       provide diagnostic in that case. */
+    if(_state->actualImageData->isCompressed()) {
+        _state->result = Result::ActualImageIsCompressed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    if(_fileState->actualImageData->isCompressed()) {
-        _state = State::ActualImageIsCompressed;
-        return false;
+    /* At this point we already know we successfully opened the actual file,
+       so save also the view on its parsed contents to avoid it going out of
+       scope. We're saving through an image converter, not the original file,
+       see saveDiagnostic() for reasons why. */
+    _state->actualFormat = _state->actualImageData->format();
+    _state->actualPixels = _state->actualImageData->pixels();
+
+    /* If the expected file can't be opened, we should still be able to save
+       the actual as a diagnostic. This could get also used to generate ground
+       truth data on the first-ever test run. */
+    if(!importer->openFile(expected) || !(_state->expectedImageData = importer->image2D(0))) {
+        _state->result = Result::ExpectedImageLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed|TestSuite::ComparisonStatusFlag::Diagnostic;
     }
 
-    if(_fileState->expectedImageData->isCompressed()) {
-        _state = State::ExpectedImageIsCompressed;
-        return false;
+    /* If the expected file is compressed, it's bad, but it doesn't mean we
+       couldn't save the actual file either */
+    if(_state->expectedImageData->isCompressed()) {
+        _state->result = Result::ExpectedImageIsCompressed;
+        return TestSuite::ComparisonStatusFlag::Failed|TestSuite::ComparisonStatusFlag::Diagnostic;
     }
 
-    _fileState->actualImage.emplace(*_fileState->actualImageData);
-    _fileState->expectedImage.emplace(*_fileState->expectedImageData);
-    return operator()(*_fileState->actualImage, *_fileState->expectedImage);
+    /* Save also a view on the expected image data and proxy to the actual data
+       comparison. If comparison failed, offer to save a diagnostic. */
+    _state->expectedImage.emplace(*_state->expectedImageData);
+    TestSuite::ComparisonStatusFlags flags = compare(_state->actualFormat, _state->actualPixels, *_state->expectedImage);
+    if(flags & TestSuite::ComparisonStatusFlag::Failed)
+        flags |= TestSuite::ComparisonStatusFlag::Diagnostic;
+    return flags;
 }
 
-bool ImageComparatorBase::operator()(const ImageView2D& actual, const std::string& expected) {
-    if(!_fileState) _fileState.reset(new FileState);
-
-    _fileState->expectedFilename = expected;
+TestSuite::ComparisonStatusFlags ImageComparatorBase::compare(const PixelFormat actualFormat, const Containers::StridedArrayView3D<const char>& actualPixels, const std::string& expected) {
+    _state->expectedFilename = expected;
 
     Containers::Pointer<Trade::AbstractImporter> importer;
-    if(!(importer = _fileState->manager->loadAndInstantiate("AnyImageImporter"))) {
-        _state = State::PluginLoadFailed;
-        return false;
+    /* Can't load importer plugin. While we *could* save diagnostic in this
+       case too, it would make no sense as it's a Schrödinger image at this
+       point -- we have no idea if it's the same or not until we open it. */
+    if(!(importer = _state->importerManager().loadAndInstantiate("AnyImageImporter"))) {
+        _state->result = Result::PluginLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    if(!importer->openFile(expected) || !(_fileState->expectedImageData = importer->image2D(0))) {
-        _state = State::ExpectedImageLoadFailed;
-        return false;
+    /* Save the actual image so saveDiagnostic() can reach the data even if we
+       fail before the final data comparison (which does this as well). The
+       reference can be pointing to the storage, don't call the assignment on
+       itself in that case. */
+    if(&_state->actualPixels != &actualPixels) {
+        _state->actualFormat = actualFormat;
+        _state->actualPixels = actualPixels;
     }
 
-    if(_fileState->expectedImageData->isCompressed()) {
-        _state = State::ExpectedImageIsCompressed;
-        return false;
+    /* If the expected file can't be opened, we should still be able to save
+       the actual as a diagnostic. This could get also used to generate ground
+       truth data on the first-ever test run. */
+    if(!importer->openFile(expected) || !(_state->expectedImageData = importer->image2D(0))) {
+        _state->result = Result::ExpectedImageLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed|TestSuite::ComparisonStatusFlag::Diagnostic;
     }
 
-    _fileState->expectedImage.emplace(*_fileState->expectedImageData);
-    return operator()(actual, *_fileState->expectedImage);
+    /* If the expected file is compressed, it's bad, but it doesn't mean we
+       couldn't save the actual file either */
+    if(_state->expectedImageData->isCompressed()) {
+        _state->result = Result::ExpectedImageIsCompressed;
+        return TestSuite::ComparisonStatusFlag::Failed|TestSuite::ComparisonStatusFlag::Diagnostic;
+    }
+
+    /* Save a view on the expected image data and proxy to the actual data
+       comparison. If comparison failed, offer to save a diagnostic. */
+    _state->expectedImage.emplace(*_state->expectedImageData);
+    TestSuite::ComparisonStatusFlags flags = compare(_state->actualFormat, _state->actualPixels, *_state->expectedImage);
+    if(flags & TestSuite::ComparisonStatusFlag::Failed)
+        flags |= TestSuite::ComparisonStatusFlag::Diagnostic;
+    return flags;
 }
 
-bool ImageComparatorBase::operator()(const std::string& actual, const ImageView2D& expected) {
-    if(!_fileState) _fileState.reset(new FileState);
+TestSuite::ComparisonStatusFlags ImageComparatorBase::operator()(const ImageView2D& actual, const std::string& expected) {
+    return compare(actual.format(), actual.pixels(), expected);
+}
 
-    _fileState->actualFilename = actual;
+TestSuite::ComparisonStatusFlags ImageComparatorBase::operator()(const std::string& actual, const ImageView2D& expected) {
+    _state->actualFilename = actual;
+
+    /* Here we are comparing against a view, not a file, so we cannot save
+       diagnostic in any case as we don't have the expected filename. This
+       behavior is consistent with TestSuite::Compare::FileToString. */
 
     Containers::Pointer<Trade::AbstractImporter> importer;
-    if(!(importer = _fileState->manager->loadAndInstantiate("AnyImageImporter"))) {
-        _state = State::PluginLoadFailed;
-        return false;
+    if(!(importer = _state->importerManager().loadAndInstantiate("AnyImageImporter"))) {
+        _state->result = Result::PluginLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    if(!importer->openFile(actual) || !(_fileState->actualImageData = importer->image2D(0))) {
-        _state = State::ActualImageLoadFailed;
-        return false;
+    if(!importer->openFile(actual) || !(_state->actualImageData = importer->image2D(0))) {
+        _state->result = Result::ActualImageLoadFailed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    if(_fileState->actualImageData->isCompressed()) {
-        _state = State::ActualImageIsCompressed;
-        return false;
+    if(_state->actualImageData->isCompressed()) {
+        _state->result = Result::ActualImageIsCompressed;
+        return TestSuite::ComparisonStatusFlag::Failed;
     }
 
-    _fileState->actualImage.emplace(*_fileState->actualImageData);
-    return operator()(*_fileState->actualImage, expected);
+    _state->actualFormat = _state->actualImageData->format();
+    _state->actualPixels = _state->actualImageData->pixels();
+    return compare(_state->actualFormat, _state->actualPixels, expected);
 }
 
-void ImageComparatorBase::printErrorMessage(Debug& out, const std::string& actual, const std::string& expected) const {
-    if(_state == State::PluginLoadFailed) {
+void ImageComparatorBase::printMessage(const TestSuite::ComparisonStatusFlags flags, Debug& out, const std::string& actual, const std::string& expected) const {
+    if(_state->result == Result::PluginLoadFailed) {
         out << "AnyImageImporter plugin could not be loaded.";
         return;
     }
-    if(_state == State::ActualImageLoadFailed) {
-        out << "Actual image" << actual << "(" << Debug::nospace << _fileState->actualFilename << Debug::nospace << ")" << "could not be loaded.";
+    if(_state->result == Result::ActualImageLoadFailed) {
+        out << "Actual image" << actual << "(" << Debug::nospace << _state->actualFilename << Debug::nospace << ")" << "could not be loaded.";
         return;
     }
-    if(_state == State::ExpectedImageLoadFailed) {
-        out << "Expected image" << expected << "(" << Debug::nospace << _fileState->expectedFilename << Debug::nospace << ")" << "could not be loaded.";
+    if(_state->result == Result::ExpectedImageLoadFailed) {
+        out << "Expected image" << expected << "(" << Debug::nospace << _state->expectedFilename << Debug::nospace << ")" << "could not be loaded.";
         return;
     }
-    if(_state == State::ActualImageIsCompressed) {
-        out << "Actual image" << actual << "(" << Debug::nospace << _fileState->actualFilename << Debug::nospace << ")" << "is compressed, comparison not possible.";
+    if(_state->result == Result::ActualImageIsCompressed) {
+        out << "Actual image" << actual << "(" << Debug::nospace << _state->actualFilename << Debug::nospace << ")" << "is compressed, comparison not possible.";
         return;
     }
-    if(_state == State::ExpectedImageIsCompressed) {
-        out << "Expected image" << expected << "(" << Debug::nospace << _fileState->expectedFilename << Debug::nospace << ")" << "is compressed, comparison not possible.";
+    if(_state->result == Result::ExpectedImageIsCompressed) {
+        out << "Expected image" << expected << "(" << Debug::nospace << _state->expectedFilename << Debug::nospace << ")" << "is compressed, comparison not possible.";
         return;
     }
 
     out << "Images" << actual << "and" << expected << "have";
-    if(_state == State::DifferentSize)
-        out << "different size, actual" << _actualImage->size() << "but"
-            << _expectedImage->size() << "expected.";
-    else if(_state == State::DifferentFormat)
-        out << "different format, actual" << _actualImage->format() << "but"
-            << _expectedImage->format() << "expected.";
+    if(_state->result == Result::DifferentSize)
+        out << "different size, actual"
+            << Vector2i{Int(_state->actualPixels.size()[1]),  Int(_state->actualPixels.size()[0])}
+            << "but" << _state->expectedImage->size() << "expected.";
+    else if(_state->result == Result::DifferentFormat)
+        out << "different format, actual" << _state->actualFormat
+            << "but" << _state->expectedImage->format() << "expected.";
     else {
-        if(_state == State::AboveThresholds)
+        if(_state->result == Result::AboveThresholds)
             out << "both max and mean delta above threshold, actual"
-                << _max << Debug::nospace << "/" << Debug::nospace << _mean
-                << "but at most" << _maxThreshold << Debug::nospace << "/"
-                << Debug::nospace << _meanThreshold << "expected.";
-        else if(_state == State::AboveMaxThreshold)
-            out << "max delta above threshold, actual" << _max
-                << "but at most" << _maxThreshold
-                << "expected. Mean delta" << _mean << "is below threshold"
-                << _meanThreshold << Debug::nospace << ".";
-        else if(_state == State::AboveMeanThreshold)
-            out << "mean delta above threshold, actual" << _mean
-                << "but at most" << _meanThreshold
-                << "expected. Max delta" << _max << "is below threshold"
-                << _maxThreshold << Debug::nospace << ".";
-        else CORRADE_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
+                << _state->max << Debug::nospace << "/" << Debug::nospace << _state->mean
+                << "but at most" << _state->maxThreshold << Debug::nospace << "/"
+                << Debug::nospace << _state->meanThreshold << "expected.";
+        else if(_state->result == Result::AboveMaxThreshold)
+            out << "max delta above threshold, actual" << _state->max
+                << "but at most" << _state->maxThreshold
+                << "expected. Mean delta" << _state->mean << "is within threshold"
+                << _state->meanThreshold << Debug::nospace << ".";
+        else if(_state->result == Result::AboveMeanThreshold)
+            out << "mean delta above threshold, actual" << _state->mean
+                << "but at most" << _state->meanThreshold
+                << "expected. Max delta" << _state->max << "is within threshold"
+                << _state->maxThreshold << Debug::nospace << ".";
+        else if(_state->result == Result::VerboseMessage) {
+            CORRADE_INTERNAL_ASSERT(flags & TestSuite::ComparisonStatusFlag::Verbose);
+            out << "deltas" << _state->max << Debug::nospace << "/"
+                << Debug::nospace << _state->mean << "below threshold"
+                << _state->maxThreshold << Debug::nospace << "/"
+                << Debug::nospace << _state->meanThreshold << Debug::nospace << ".";
+        } else CORRADE_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
 
         out << "Delta image:" << Debug::newline;
-        DebugTools::Implementation::printDeltaImage(out, _delta, _expectedImage->size(), _max, _maxThreshold, _meanThreshold);
-        DebugTools::Implementation::printPixelDeltas(out, _delta, *_actualImage, *_expectedImage, _maxThreshold, _meanThreshold, 10);
+        DebugTools::Implementation::printDeltaImage(out, _state->delta, _state->expectedImage->size(), _state->max, _state->maxThreshold, _state->meanThreshold);
+        CORRADE_INTERNAL_ASSERT(_state->actualFormat == _state->expectedImage->format());
+        DebugTools::Implementation::printPixelDeltas(out, _state->delta, _state->actualFormat, _state->actualPixels, _state->expectedImage->pixels(), _state->maxThreshold, _state->meanThreshold, 10);
     }
+}
+
+void ImageComparatorBase::saveDiagnostic(TestSuite::ComparisonStatusFlags, Utility::Debug& out, const std::string& path) {
+    /* Tightly pack the actual pixels into a new array and create an image from
+       it -- the array view might have totally arbitrary strides that can't
+       be represented in an Image */
+    Containers::Array<char> data{_state->actualPixels.size()[0]*_state->actualPixels.size()[1]*_state->actualPixels.size()[2]};
+    Containers::StridedArrayView3D<char> pixels{data, _state->actualPixels.size()};
+    for(std::size_t i = 0, iMax = _state->actualPixels.size()[0]; i != iMax; ++i) {
+        Containers::StridedArrayView2D<const char> inRow = _state->actualPixels[i];
+        Containers::StridedArrayView2D<char> outRow = pixels[i];
+        for(std::size_t j = 0, jMax = inRow.size()[0]; j != jMax; ++j) {
+            Containers::StridedArrayView1D<const char> inPixel = inRow[j];
+            Containers::StridedArrayView1D<char> outPixel = outRow[j];
+            for(std::size_t k = 0, kMax = inPixel.size(); k != kMax; ++k)
+                outPixel[k] = inPixel[k];
+        }
+    }
+
+    const ImageView2D image{PixelStorage{}.setAlignment(1), _state->actualFormat, Vector2i{Int(pixels.size()[1]), Int(pixels.size()[0])}, data};
+    const std::string filename = Utility::Directory::join(path, Utility::Directory::filename(_state->expectedFilename));
+
+    /* Export the data the base view/view comparator saved. Ignore failures,
+       we're in the middle of a fail anyway (and everything will print messages
+       to the output nevertheless). */
+    Containers::Pointer<Trade::AbstractImageConverter> converter = _state->converterManager().loadAndInstantiate("AnyImageConverter");
+    if(converter && converter->exportToFile(image, filename))
+        out << "->" << filename;
 }
 
 }}}

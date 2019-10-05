@@ -104,9 +104,9 @@ template<UnsignedInt dimensions, class T> class Range {
         constexpr /*implicit*/ Range() noexcept: Range<dimensions, T>{ZeroInit, typename std::conditional<dimensions == 1, void*, ZeroInitT*>::type{}} {}
 
         /**
-         * @brief Construct zero range
+         * @brief Construct a zero range
          *
-         * Construct zero-size range positioned at origin.
+         * Construct a zero-size range positioned at origin.
          */
         constexpr explicit Range(ZeroInitT) noexcept: Range<dimensions, T>{ZeroInit, typename std::conditional<dimensions == 1, void*, ZeroInitT*>::type{}} {}
 
@@ -334,6 +334,9 @@ template<UnsignedInt dimensions, class T> class Range {
     }                                                                       \
     Type<T> scaled(const VectorType<T>& scaling) const {                    \
         return Range<dimensions, T>::scaled(scaling);                       \
+    }                                                                       \
+    Type<T> scaledFromCenter(const VectorType<T>& scaling) const {          \
+        return Range<dimensions, T>::scaledFromCenter(scaling);             \
     }
 #endif
 
@@ -607,7 +610,7 @@ template<class T> class Range3D: public Range<3, T> {
         }
 
         /** @brief Range in the XY plane */
-        constexpr Range<2, T> xy() const {
+        constexpr Range2D<T> xy() const {
             return {Range<3, T>::min().xy(), Range<3, T>::max().xy()};
         }
 

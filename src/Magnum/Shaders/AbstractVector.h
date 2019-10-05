@@ -59,6 +59,15 @@ template<UnsignedInt dimensions> class AbstractVector: public GL::AbstractShader
          */
         typedef typename Generic<dimensions>::TextureCoordinates TextureCoordinates;
 
+        enum: UnsignedInt {
+            /**
+             * Color shader output. @ref shaders-generic "Generic output",
+             * present always. Expects three- or four-component floating-point
+             * or normalized buffer attachment.
+             */
+            ColorOutput = Generic<dimensions>::ColorOutput
+        };
+
         /** @brief Copying is not allowed */
         AbstractVector(const AbstractVector<dimensions>&) = delete;
 
@@ -91,7 +100,11 @@ template<UnsignedInt dimensions> class AbstractVector: public GL::AbstractShader
     #else
     private:
     #endif
-        enum: Int { VectorTextureLayer = 15 };
+        /* Those textures are quite specific (and likely reused multiple times
+           per frame for e.g. text rendering, so put them in a specific slot.
+           Older iOS (and iOS WebGL) has only 8 texture binding slots, so can't
+           go above that. Binding 7 is used by TextureTools::DistanceField. */
+        enum: Int { VectorTextureLayer = 6 };
 
         explicit AbstractVector(NoCreateT) noexcept: GL::AbstractShaderProgram{NoCreate} {}
         explicit AbstractVector() = default;

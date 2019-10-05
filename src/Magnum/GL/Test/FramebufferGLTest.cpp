@@ -23,10 +23,12 @@
     DEALINGS IN THE SOFTWARE.
 */
 
+#include <sstream>
 #include <Corrade/TestSuite/Compare/Container.h>
 #include <Corrade/Utility/DebugStl.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/GL/Context.h"
 #include "Magnum/GL/CubeMapTexture.h"
 #include "Magnum/GL/Extensions.h"
@@ -123,6 +125,9 @@ struct FramebufferGLTest: OpenGLTester {
     void invalidateSub();
     #endif
     void read();
+    void readView();
+    void readViewNullptr();
+    void readViewBadSize();
     #ifndef MAGNUM_TARGET_GLES2
     void readBuffer();
     #endif
@@ -262,6 +267,9 @@ FramebufferGLTest::FramebufferGLTest() {
               &FramebufferGLTest::invalidateSub,
               #endif
               &FramebufferGLTest::read,
+              &FramebufferGLTest::readView,
+              &FramebufferGLTest::readViewNullptr,
+              &FramebufferGLTest::readViewBadSize,
               #ifndef MAGNUM_TARGET_GLES2
               &FramebufferGLTest::readBuffer,
               #endif
@@ -1159,7 +1167,7 @@ void FramebufferGLTest::clearColorI() {
         {PixelFormat::RGBAInteger, PixelType::Int});
 
     MAGNUM_VERIFY_NO_GL_ERROR();
-    CORRADE_COMPARE(colorImage.data<Vector4i>()[0], (Vector4i{-124, 67, 37, 17}));
+    CORRADE_COMPARE(Containers::arrayCast<Vector4i>(colorImage.data())[0], (Vector4i{-124, 67, 37, 17}));
 }
 
 void FramebufferGLTest::clearColorUI() {
@@ -1186,7 +1194,7 @@ void FramebufferGLTest::clearColorUI() {
         {PixelFormat::RGBAInteger, PixelType::UnsignedInt});
 
     MAGNUM_VERIFY_NO_GL_ERROR();
-    CORRADE_COMPARE(colorImage.data<Vector4ui>()[0], (Vector4ui{240, 67, 37, 17}));
+    CORRADE_COMPARE(Containers::arrayCast<Vector4ui>(colorImage.data())[0], (Vector4ui{240, 67, 37, 17}));
 }
 
 void FramebufferGLTest::clearColorF() {
@@ -1213,7 +1221,7 @@ void FramebufferGLTest::clearColorF() {
         {PixelFormat::RGBA, PixelType::UnsignedByte});
 
     MAGNUM_VERIFY_NO_GL_ERROR();
-    CORRADE_COMPARE(colorImage.data<Color4ub>()[0], (Color4ub{128, 64, 32, 17}));
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(colorImage.data())[0], (Color4ub{128, 64, 32, 17}));
 }
 
 void FramebufferGLTest::clearDepth() {
@@ -1254,7 +1262,7 @@ void FramebufferGLTest::clearDepth() {
         Image2D depthImage = framebuffer.read({{}, Vector2i{1}}, {PixelFormat::DepthComponent, PixelType::UnsignedShort});
 
         MAGNUM_VERIFY_NO_GL_ERROR();
-        CORRADE_COMPARE(depthImage.data<UnsignedShort>()[0], 48352);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedShort>(depthImage.data())[0], 48352);
     }
     #endif
 }
@@ -1295,7 +1303,7 @@ void FramebufferGLTest::clearStencil() {
         Image2D stencilImage = framebuffer.read({{}, Vector2i{1}}, {PixelFormat::StencilIndex, PixelType::UnsignedByte});
 
         MAGNUM_VERIFY_NO_GL_ERROR();
-        CORRADE_COMPARE(stencilImage.data<UnsignedByte>()[0], 67);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedByte>(stencilImage.data())[0], 67);
     }
     #endif
 }
@@ -1337,8 +1345,8 @@ void FramebufferGLTest::clearDepthStencil() {
 
         MAGNUM_VERIFY_NO_GL_ERROR();
         /** @todo This will probably fail on different systems */
-        CORRADE_COMPARE(depthStencilImage.data<UnsignedInt>()[0] >> 8, 12378300);
-        CORRADE_COMPARE(depthStencilImage.data<UnsignedByte>()[0], 67);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedInt>(depthStencilImage.data())[0] >> 8, 12378300);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedByte>(depthStencilImage.data())[0], 67);
     }
     #endif
 }
@@ -1475,9 +1483,9 @@ void FramebufferGLTest::read() {
     CORRADE_COMPARE(colorImage.size(), Vector2i(8, 16));
     CORRADE_COMPARE(colorImage.data().size(), (DataOffset + 8*16)*sizeof(Color4ub));
     #ifndef MAGNUM_TARGET_GLES2
-    CORRADE_COMPARE(colorImage.data<Color4ub>()[DataOffset], 0x80402011_rgba);
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(colorImage.data())[DataOffset], 0x80402011_rgba);
     #else /* using only RGBA4, less precision */
-    CORRADE_COMPARE(colorImage.data<Color4ub>()[DataOffset], 0x88442211_rgba);
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(colorImage.data())[DataOffset], 0x88442211_rgba);
     #endif
 
     #ifndef MAGNUM_TARGET_WEBGL
@@ -1492,7 +1500,7 @@ void FramebufferGLTest::read() {
         Image2D depthImage = framebuffer.read({{}, Vector2i{1}}, {PixelFormat::DepthComponent, PixelType::UnsignedShort});
 
         MAGNUM_VERIFY_NO_GL_ERROR();
-        CORRADE_COMPARE(depthImage.data<UnsignedShort>()[0], 48352);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedShort>(depthImage.data())[0], 48352);
     }
 
     #ifdef MAGNUM_TARGET_GLES
@@ -1506,7 +1514,7 @@ void FramebufferGLTest::read() {
         Image2D stencilImage = framebuffer.read({{}, Vector2i{1}}, {PixelFormat::StencilIndex, PixelType::UnsignedByte});
 
         MAGNUM_VERIFY_NO_GL_ERROR();
-        CORRADE_COMPARE(stencilImage.data<UnsignedByte>()[0], 67);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedByte>(stencilImage.data())[0], 67);
     }
 
     #ifdef MAGNUM_TARGET_GLES
@@ -1521,10 +1529,107 @@ void FramebufferGLTest::read() {
 
         MAGNUM_VERIFY_NO_GL_ERROR();
         /** @todo This will probably fail on different systems */
-        CORRADE_COMPARE(depthStencilImage.data<UnsignedInt>()[0] >> 8, 12378300);
-        CORRADE_COMPARE(depthStencilImage.data<UnsignedByte>()[0], 67);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedInt>(depthStencilImage.data())[0] >> 8, 12378300);
+        CORRADE_COMPARE(Containers::arrayCast<UnsignedByte>(depthStencilImage.data())[0], 67);
     }
     #endif
+}
+
+void FramebufferGLTest::readView() {
+    using namespace Math::Literals;
+
+    #ifndef MAGNUM_TARGET_GLES
+    if(!Context::current().isExtensionSupported<Extensions::ARB::framebuffer_object>())
+        CORRADE_SKIP(Extensions::ARB::framebuffer_object::string() + std::string(" is not available."));
+    #endif
+
+    Renderbuffer color;
+    #ifndef MAGNUM_TARGET_GLES2
+    color.setStorage(RenderbufferFormat::RGBA8, Vector2i(128));
+    #else
+    color.setStorage(RenderbufferFormat::RGBA4, Vector2i(128));
+    #endif
+
+    Framebuffer framebuffer({{}, Vector2i(128)});
+    framebuffer.attachRenderbuffer(Framebuffer::ColorAttachment(0), color);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+    CORRADE_COMPARE(framebuffer.checkStatus(FramebufferTarget::Read), Framebuffer::Status::Complete);
+    CORRADE_COMPARE(framebuffer.checkStatus(FramebufferTarget::Draw), Framebuffer::Status::Complete);
+
+    #ifndef MAGNUM_TARGET_GLES2
+    Renderer::setClearColor(0x80402011_rgbaf);
+    #else
+    /* Using only RGBA4, supply less precision. This has to be one on the input
+       because SwiftShader stores RGBA4 as RGBA8 internally, thus preserving
+       the full precision of the input. */
+    Renderer::setClearColor(0x88442211_rgbaf);
+    #endif
+    Renderer::setClearDepth(Math::unpack<Float, UnsignedShort>(48352));
+    Renderer::setClearStencil(67);
+    framebuffer.clear(FramebufferClear::Color);
+
+    char data[(DataOffset + 8*16)*sizeof(Color4ub)]{};
+    MutableImageView2D view{DataStorage, PixelFormat::RGBA, PixelType::UnsignedByte, {8, 16}, data};
+    framebuffer.read(Range2Di::fromSize({16, 8}, {8, 16}), view);
+
+    MAGNUM_VERIFY_NO_GL_ERROR();
+    CORRADE_COMPARE(view.size(), Vector2i(8, 16));
+    CORRADE_COMPARE(view.data().size(), (DataOffset + 8*16)*sizeof(Color4ub));
+    #ifndef MAGNUM_TARGET_GLES2
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(view.data())[DataOffset], 0x80402011_rgba);
+    #else /* using only RGBA4, less precision */
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(view.data())[DataOffset], 0x88442211_rgba);
+    #endif
+}
+
+void FramebufferGLTest::readViewNullptr() {
+    #ifndef MAGNUM_TARGET_GLES
+    if(!Context::current().isExtensionSupported<Extensions::ARB::framebuffer_object>())
+        CORRADE_SKIP(Extensions::ARB::framebuffer_object::string() + std::string(" is not available."));
+    #endif
+
+    Renderbuffer color;
+    #ifndef MAGNUM_TARGET_GLES2
+    color.setStorage(RenderbufferFormat::RGBA8, Vector2i(128));
+    #else
+    color.setStorage(RenderbufferFormat::RGBA4, Vector2i(128));
+    #endif
+
+    Framebuffer framebuffer({{}, Vector2i(128)});
+    framebuffer.attachRenderbuffer(Framebuffer::ColorAttachment(0), color);
+
+    MutableImageView2D view{DataStorage, PixelFormat::RGBA, PixelType::UnsignedByte, {8, 16}};
+
+    std::ostringstream out;
+    Error redirectError{&out};
+    framebuffer.read({{}, {8, 16}}, view);
+    CORRADE_COMPARE(out.str(), "GL::AbstractFramebuffer::read(): image view is nullptr\n");
+}
+
+void FramebufferGLTest::readViewBadSize() {
+    #ifndef MAGNUM_TARGET_GLES
+    if(!Context::current().isExtensionSupported<Extensions::ARB::framebuffer_object>())
+        CORRADE_SKIP(Extensions::ARB::framebuffer_object::string() + std::string(" is not available."));
+    #endif
+
+    Renderbuffer color;
+    #ifndef MAGNUM_TARGET_GLES2
+    color.setStorage(RenderbufferFormat::RGBA8, Vector2i(128));
+    #else
+    color.setStorage(RenderbufferFormat::RGBA4, Vector2i(128));
+    #endif
+
+    Framebuffer framebuffer({{}, Vector2i(128)});
+    framebuffer.attachRenderbuffer(Framebuffer::ColorAttachment(0), color);
+
+    char data[(DataOffset + 8*15)*sizeof(Color4ub)]{};
+    MutableImageView2D view{DataStorage, PixelFormat::RGBA, PixelType::UnsignedByte, {8, 15}, data};
+
+    std::ostringstream out;
+    Error redirectError{&out};
+    framebuffer.read({{}, {8, 16}}, view);
+    CORRADE_COMPARE(out.str(), "GL::AbstractFramebuffer::read(): expected image view size Vector(8, 16) but got Vector(8, 15)\n");
 }
 
 #ifndef MAGNUM_TARGET_GLES2
@@ -2127,14 +2232,14 @@ void FramebufferGLTest::blit() {
     Image2D imageBefore = b.read({{}, Vector2i{1}}, {PixelFormat::RGBA, PixelType::UnsignedByte});
 
     MAGNUM_VERIFY_NO_GL_ERROR();
-    CORRADE_COMPARE(imageBefore.data<Color4ub>()[0], Color4ub());
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(imageBefore.data())[0], Color4ub());
 
     /* And have given color after */
     Framebuffer::blit(a, b, a.viewport(), FramebufferBlit::Color);
     Image2D imageAfter = b.read({{}, Vector2i{1}}, {PixelFormat::RGBA, PixelType::UnsignedByte});
 
     MAGNUM_VERIFY_NO_GL_ERROR();
-    CORRADE_COMPARE(imageAfter.data<Color4ub>()[0], Color4ub(128, 64, 32, 17));
+    CORRADE_COMPARE(Containers::arrayCast<Color4ub>(imageAfter.data())[0], Color4ub(128, 64, 32, 17));
 }
 #endif
 

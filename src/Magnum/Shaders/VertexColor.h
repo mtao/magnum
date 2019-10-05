@@ -31,9 +31,6 @@
 
 #include "Magnum/DimensionTraits.h"
 #include "Magnum/GL/AbstractShaderProgram.h"
-#include "Magnum/Math/Color.h"
-#include "Magnum/Math/Matrix3.h"
-#include "Magnum/Math/Matrix4.h"
 #include "Magnum/Shaders/Generic.h"
 #include "Magnum/Shaders/visibility.h"
 
@@ -48,6 +45,11 @@ an identity transformation. Use @ref setTransformationProjectionMatrix() to
 configure the shader.
 
 @image html shaders-vertexcolor.png width=256px
+
+This shader is equivalent to @ref Flat with @ref Flat::Flag::VertexColor
+enabled; the 3D version of this shader is equivalent to @ref Phong with
+@ref Phong::Flag::VertexColor enabled. In both cases this implementation is
+much simpler and thus likely also faster.
 
 @section Shaders-VertexColor-example Example usage
 
@@ -74,7 +76,7 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT VertexColor: public
         typedef typename Generic<dimensions>::Position Position;
 
         /**
-         * @brief Three-component vertex color.
+         * @brief Three-component vertex color
          *
          * @ref shaders-generic "Generic attribute", @ref Magnum::Color3. Use
          * either this or the @ref Color4 attribute.
@@ -82,12 +84,21 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT VertexColor: public
         typedef typename Generic<dimensions>::Color3 Color3;
 
         /**
-         * @brief Four-component vertex color.
+         * @brief Four-component vertex color
          *
          * @ref shaders-generic "Generic attribute", @ref Magnum::Color4. Use
          * either this or the @ref Color3 attribute.
          */
         typedef typename Generic<dimensions>::Color4 Color4;
+
+        enum: UnsignedInt {
+            /**
+             * Color shader output. @ref shaders-generic "Generic output",
+             * present always. Expects three- or four-component floating-point
+             * or normalized buffer attachment.
+             */
+            ColorOutput = Generic<dimensions>::ColorOutput
+        };
 
         #ifdef MAGNUM_BUILD_DEPRECATED
         /**
@@ -102,7 +113,7 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT VertexColor: public
         /**
          * @brief Construct without creating the underlying OpenGL object
          *
-         * The constructed instance is equivalent to moved-from state. Useful
+         * The constructed instance is equivalent to a moved-from state. Useful
          * in cases where you will overwrite the instance later anyway. Move
          * another object over it to make it useful.
          *
@@ -129,10 +140,7 @@ template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT VertexColor: public
          *
          * Default is an identity matrix.
          */
-        VertexColor<dimensions>& setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix) {
-            setUniform(_transformationProjectionMatrixUniform, matrix);
-            return *this;
-        }
+        VertexColor<dimensions>& setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix);
 
     private:
         Int _transformationProjectionMatrixUniform{0};

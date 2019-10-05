@@ -40,7 +40,7 @@
 #include "Magnum/SceneGraph/SceneGraph.h"
 
 /** @todo fix this better */
-#ifdef CORRADE_MSVC2017_COMPATIBILITY
+#ifdef _MSC_VER /* This is not a bug, this is a feature :( Not even /permissive- helps. */
 #include "Magnum/DebugTools/ForceRenderer.h"
 #include "Magnum/DebugTools/ObjectRenderer.h"
 #include "Magnum/GL/AbstractShaderProgram.h"
@@ -65,6 +65,13 @@ information.
 class MAGNUM_DEBUGTOOLS_EXPORT ResourceManager: public Magnum::ResourceManager<Magnum::Implementation::ResourceManagerLocalInstance, GL::AbstractShaderProgram, GL::Buffer, GL::Mesh, GL::MeshView, DebugTools::ForceRendererOptions, DebugTools::ObjectRendererOptions>
 {
     public:
+        /**
+         * @brief Global instance
+         *
+         * Assumes that the instance exists.
+         */
+        static ResourceManager& instance();
+
         explicit ResourceManager();
         ~ResourceManager();
 };

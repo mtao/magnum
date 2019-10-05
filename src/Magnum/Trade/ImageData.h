@@ -31,7 +31,8 @@
 
 #include <Corrade/Containers/Array.h>
 
-#include "Magnum/ImageView.h"
+#include "Magnum/DimensionTraits.h"
+#include "Magnum/PixelStorage.h"
 #include "Magnum/Trade/visibility.h"
 
 namespace Magnum { namespace Trade {
@@ -235,7 +236,9 @@ template<UnsignedInt dimensions> class ImageData {
          */
         /* Not restricted to const&, because we might want to pass the view to
            another function in an oneliner (e.g. saving screenshot) */
-        /*implicit*/ operator ImageView<dimensions>() const;
+        /*implicit*/ operator BasicMutableImageView<dimensions>();
+        /** @overload */
+        /*implicit*/ operator BasicImageView<dimensions>() const;
 
         /**
          * @brief Conversion to compressed view
@@ -245,7 +248,9 @@ template<UnsignedInt dimensions> class ImageData {
          */
         /* Not restricted to const&, because we might want to pass the view to
            another function in an oneliner (e.g. saving screenshot) */
-        /*implicit*/ operator CompressedImageView<dimensions>() const;
+        /*implicit*/ operator BasicMutableCompressedImageView<dimensions>();
+        /** @overload */
+        /*implicit*/ operator BasicCompressedImageView<dimensions>() const;
 
         /**
          * @brief Storage of pixel data
@@ -329,26 +334,51 @@ template<UnsignedInt dimensions> class ImageData {
            needless state changes -- thus the calculation can't be done */
 
         /**
-         * @brief Raw data
+         * @brief Image data
          *
          * @see @ref release(), @ref pixels()
          */
         Containers::ArrayView<char> data() & { return _data; }
-        Containers::ArrayView<char> data() && = delete; /**< @overload */
 
         /** @overload */
         Containers::ArrayView<const char> data() const & { return _data; }
-        Containers::ArrayView<const char> data() const && = delete; /**< @overload */
 
-        /** @overload */
-        template<class T> T* data() {
+        /**
+         * @brief Image data from a r-value
+         *
+         * Unlike @ref data(), which returns a view, this is equivalent to
+         * @ref release() to avoid a dangling view when the temporary instance
+         * goes out of scope.
+         * @todoc stupid doxygen can't link to & overloads ffs
+         */
+        Containers::Array<char> data() && { return release(); }
+
+        /** @overload
+         * @todo what to do here?!
+         */
+        Containers::Array<char> data() const && = delete;
+
+        #ifdef MAGNUM_BUILD_DEPRECATED
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class T> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") T* data() {
             return reinterpret_cast<T*>(_data.data());
         }
 
-        /** @overload */
-        template<class T> const T* data() const {
+        /**
+         * @brief Image data in a particular type
+         * @deprecated Use non-templated @ref data() together with
+         *      @ref Corrade::Containers::arrayCast() instead for properly
+         *      bounds-checked type conversion.
+         */
+        template<class T> CORRADE_DEPRECATED("use data() together with Containers::arrayCast() instead") const T* data() const {
             return reinterpret_cast<const T*>(_data.data());
         }
+        #endif
 
         /**
          * @brief View on pixel data
@@ -415,13 +445,13 @@ template<UnsignedInt dimensions> class ImageData {
         const void* _importerState;
 };
 
-/** @brief One-dimensional image */
+/** @brief One-dimensional image data */
 typedef ImageData<1> ImageData1D;
 
-/** @brief Two-dimensional image */
+/** @brief Two-dimensional image data */
 typedef ImageData<2> ImageData2D;
 
-/** @brief Three-dimensional image */
+/** @brief Three-dimensional image data */
 typedef ImageData<3> ImageData3D;
 
 template<UnsignedInt dimensions> template<class T, class U> ImageData<dimensions>::ImageData(const PixelStorage storage, const T format, const U formatExtra, const VectorTypeFor<dimensions, Int>& size, Containers::Array<char>&& data, const void* const importerState) noexcept: ImageData{storage, UnsignedInt(format), UnsignedInt(formatExtra), Magnum::Implementation::pixelSizeAdl(format, formatExtra), size, std::move(data), importerState} {
@@ -437,46 +467,6 @@ template<UnsignedInt dimensions> template<class T> ImageData<dimensions>::ImageD
 template<UnsignedInt dimensions> template<class T> ImageData<dimensions>::ImageData(const CompressedPixelStorage storage, const T format, const VectorTypeFor<dimensions, Int>& size, Containers::Array<char>&& data, const void* const importerState) noexcept: ImageData{storage, UnsignedInt(format), size, std::move(data), importerState} {
     static_assert(sizeof(T) <= 4,
         "format types larger than 32bits are not supported");
-}
-
-template<UnsignedInt dimensions> inline ImageData<dimensions>::ImageData(ImageData<dimensions>&& other) noexcept: _compressed{std::move(other._compressed)}, _size{std::move(other._size)}, _data{std::move(other._data)}, _importerState{std::move(other._importerState)} {
-    if(_compressed) {
-        new(&_compressedStorage) CompressedPixelStorage{std::move(other._compressedStorage)};
-        _compressedFormat = std::move(other._compressedFormat);
-    }
-    else {
-        new(&_storage) PixelStorage{std::move(other._storage)};
-        _format = std::move(other._format);
-        _formatExtra = std::move(other._formatExtra);
-        _pixelSize = std::move(other._pixelSize);
-    }
-
-    other._size = {};
-}
-
-template<UnsignedInt dimensions> inline ImageData<dimensions>& ImageData<dimensions>::operator=(ImageData<dimensions>&& other) noexcept {
-    using std::swap;
-    swap(_compressed, other._compressed);
-    if(_compressed) {
-        swap(_compressedStorage, other._compressedStorage);
-        swap(_compressedFormat, other._compressedFormat);
-    }
-    else {
-        swap(_storage, other._storage);
-        swap(_format, other._format);
-    }
-    swap(_formatExtra, other._formatExtra);
-    swap(_pixelSize, other._pixelSize);
-    swap(_size, other._size);
-    swap(_data, other._data);
-    swap(_importerState, other._importerState);
-    return *this;
-}
-
-template<UnsignedInt dimensions> inline Containers::Array<char> ImageData<dimensions>::release() {
-    Containers::Array<char> data{std::move(_data)};
-    _size = {};
-    return data;
 }
 
 }}

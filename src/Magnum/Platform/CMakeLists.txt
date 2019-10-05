@@ -3,6 +3,7 @@
 #
 #   Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019
 #             Vladimír Vondruš <mosra@centrum.cz>
+#   Copyright © 2018, 2019 Jonathan Hale <squareys@googlemail.com>
 #
 #   Permission is hereby granted, free of charge, to any person obtaining a
 #   copy of this software and associated documentation files (the "Software"),
@@ -35,9 +36,9 @@ set(MagnumPlatform_HEADERS
 
 set(MagnumPlatform_PRIVATE_HEADERS )
 
-# DPI scaling queries only for Sdl2Application and GlfwApplication at the
-# moment, build the files only then
-if(WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION)
+# DPI scaling queries only for EmscriptenApplication, Sdl2Application and
+# GlfwApplication at the moment, build the files only then
+if(WITH_EMSCRIPTENAPPLICATION OR WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION)
     # List of libraries to link when using the MagnumPlatformObjects target
     # TODO: use target_link_libraries() when we are on a CMake version that
     # supports it (3.12?)
@@ -58,7 +59,7 @@ if(WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION)
         ${MagnumPlatform_SRCS}
         ${MagnumPlatform_HEADERS}
         ${MagnumPlatform_PRIVATE_HEADERS})
-    target_include_directories(MagnumPlatformObjects PUBLIC $<TARGET_PROPERTY:MagnumGL,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_include_directories(MagnumPlatformObjects PUBLIC $<TARGET_PROPERTY:Magnum,INTERFACE_INCLUDE_DIRECTORIES>)
     if(BUILD_STATIC_PIC)
         set_target_properties(MagnumPlatformObjects PROPERTIES POSITION_INDEPENDENT_CODE ON)
     endif()
@@ -91,17 +92,27 @@ set(MagnumPlatform_FILES )
 
 install(FILES ${MagnumPlatform_HEADERS} DESTINATION ${MAGNUM_INCLUDE_INSTALL_DIR}/Platform)
 
-# Decide about platform-specific context for cross-platform toolkits
-if((WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION) AND TARGET_GL)
-    if(CORRADE_TARGET_APPLE AND NOT MAGNUM_TARGET_GLES)
-        set(NEED_CGLCONTEXT 1)
-        set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumCglContextObjects>)
-    elseif(CORRADE_TARGET_WINDOWS AND (NOT MAGNUM_TARGET_GLES OR MAGNUM_TARGET_DESKTOP_GLES))
-        set(NEED_WGLCONTEXT 1)
-        set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumWglContextObjects>)
-    elseif(CORRADE_TARGET_UNIX AND (NOT MAGNUM_TARGET_GLES OR MAGNUM_TARGET_DESKTOP_GLES))
-        set(NEED_GLXCONTEXT 1)
-        set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumGlxContextObjects>)
+if(TARGET_GL)
+    # Decide about platform-specific context for cross-platform toolkits
+    if(WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION)
+        if(CORRADE_TARGET_APPLE AND NOT MAGNUM_TARGET_GLES)
+            set(NEED_CGLCONTEXT 1)
+            set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumCglContextObjects>)
+        elseif(CORRADE_TARGET_WINDOWS AND (NOT MAGNUM_TARGET_GLES OR MAGNUM_TARGET_DESKTOP_GLES))
+            set(NEED_WGLCONTEXT 1)
+            set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumWglContextObjects>)
+        elseif(CORRADE_TARGET_UNIX AND (NOT MAGNUM_TARGET_GLES OR MAGNUM_TARGET_DESKTOP_GLES))
+            set(NEED_GLXCONTEXT 1)
+            set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumGlxContextObjects>)
+        elseif(MAGNUM_TARGET_GLES AND NOT CORRADE_TARGET_EMSCRIPTEN)
+            set(NEED_EGLCONTEXT 1)
+            set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumEglContextObjects>)
+            # We're linking to EGL explicitly, no need to bother with GLVND there
+        endif()
+    endif()
+
+    # This is needed also by [Windowless]GlxApplication
+    if((WITH_GLXAPPLICATION OR WITH_WINDOWLESSGLXAPPLICATION OR WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION) AND CORRADE_TARGET_UNIX AND (NOT MAGNUM_TARGET_GLES OR MAGNUM_TARGET_DESKTOP_GLES))
         # If the GLVND library (CMake 3.11+) was found and linked to, we need
         # to link to GLX explicitly. Otherwise (and also on all systems except
         # Linux) the transitive dependency to classic GL lib from MagnumGL is
@@ -112,10 +123,6 @@ if((WITH_GLFWAPPLICATION OR WITH_SDL2APPLICATION) AND TARGET_GL)
         if(OPENGL_opengl_LIBRARY AND OpenGL_GL_PREFERENCE STREQUAL GLVND)
             set(MagnumSomeContext_LIBRARY OpenGL::GLX)
         endif()
-    elseif(MAGNUM_TARGET_GLES AND NOT CORRADE_TARGET_EMSCRIPTEN)
-        set(NEED_EGLCONTEXT 1)
-        set(MagnumSomeContext_OBJECTS $<TARGET_OBJECTS:MagnumEglContextObjects>)
-        # We're linking to EGL explicitly, no need to bother with GLVND there
     endif()
 endif()
 
@@ -168,6 +175,45 @@ if(WITH_ANDROIDAPPLICATION)
 
     # Magnum AndroidApplication target alias for superprojects
     add_library(Magnum::AndroidApplication ALIAS MagnumAndroidApplication)
+endif()
+
+# Emscripten application
+if(WITH_EMSCRIPTENAPPLICATION)
+    if(NOT CORRADE_TARGET_EMSCRIPTEN)
+        message(FATAL_ERROR "EmscriptenApplication is available only when targeting Emscripten. Set WITH_EMSCRIPTENAPPLICATION to OFF to skip building it.")
+    endif()
+
+    set(MagnumEmscriptenApplication_SRCS
+        $<TARGET_OBJECTS:MagnumPlatformObjects>
+        EmscriptenApplication.cpp)
+    set(MagnumEmscriptenApplication_HEADERS
+        EmscriptenApplication.h)
+
+    add_library(MagnumEmscriptenApplication STATIC
+        ${MagnumEmscriptenApplication_SRCS}
+        ${MagnumEmscriptenApplication_HEADERS}
+        ${MagnumEmscriptenApplication_PRIVATE_HEADERS})
+    set_target_properties(MagnumEmscriptenApplication PROPERTIES
+        DEBUG_POSTFIX "-d"
+        FOLDER "Magnum/Platform")
+    # TODO: use MagnumPlatformObjects instead of ${MagnumPlatform_*} when
+    # CMake supports it
+    target_link_libraries(MagnumEmscriptenApplication PUBLIC Magnum
+        ${MagnumPlatform_LINK_LIBRARIES})
+    target_compile_definitions(MagnumEmscriptenApplication PRIVATE
+        ${MagnumPlatform_COMPILE_DEFINITIONS})
+    if(TARGET_GL)
+        target_link_libraries(MagnumEmscriptenApplication PUBLIC MagnumGL)
+    endif()
+
+    install(FILES ${MagnumEmscriptenApplication_HEADERS} DESTINATION ${MAGNUM_INCLUDE_INSTALL_DIR}/Platform)
+    install(TARGETS MagnumEmscriptenApplication
+        RUNTIME DESTINATION ${MAGNUM_BINARY_INSTALL_DIR}
+        LIBRARY DESTINATION ${MAGNUM_LIBRARY_INSTALL_DIR}
+        ARCHIVE DESTINATION ${MAGNUM_LIBRARY_INSTALL_DIR})
+
+    # Magnum EmscriptenApplication target alias for superprojects
+    add_library(Magnum::EmscriptenApplication ALIAS MagnumEmscriptenApplication)
 endif()
 
 # GLFW application

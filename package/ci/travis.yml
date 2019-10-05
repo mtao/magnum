@@ -60,6 +60,18 @@ matrix:
         packages:
         - ninja-build
         - lcov
+        - libsdl2-dev
+        - libglfw3-dev
+  - language: cpp
+    os: linux
+    dist: xenial
+    compiler: gcc
+    env:
+    - JOBID=linux-static
+    - TARGET=desktop
+    - CMAKE_CXX_FLAGS="--coverage"
+    - LCOV_EXTRA_OPTS="--gcov-tool /usr/bin/gcov-4.8"
+    - BUILD_STATIC=ON
   - language: cpp
     os: linux
     dist: xenial
@@ -99,6 +111,16 @@ matrix:
     - CMAKE_CXX_FLAGS="--coverage"
   - language: cpp
     os: osx
+    # See above
+    osx_image: xcode9.3
+    compiler: clang
+    env:
+    - JOBID=macos-static
+    - TARGET=desktop
+    - CMAKE_CXX_FLAGS="--coverage"
+    - BUILD_STATIC=ON
+  - language: cpp
+    os: osx
     osx_image: xcode7.3
     env:
     - JOBID=ios-gles2
@@ -113,14 +135,20 @@ matrix:
     - TARGET_GLES2=OFF
   - language: cpp
     os: osx
-    osx_image: xcode9.3
+    # Since August 1st, 2019, tests that iterate over 65536 elements
+    # (MathHalfTest, MathPackingTest and MathColorTest) are segfaulting on the
+    # xcode9.3 image. Using whatever image is the default instead.
+    #osx_image: xcode9.3
     env:
     - JOBID=emscripten-webgl1
     - TARGET=emscripten
     - TARGET_GLES2=ON
   - language: cpp
     os: osx
-    osx_image: xcode9.3
+    # Since August 1st, 2019, tests that iterate over 65536 elements
+    # (MathHalfTest, MathPackingTest and MathColorTest) are segfaulting on the
+    # xcode9.3 image. Using whatever image is the default instead.
+    #osx_image: xcode9.3
     env:
     - JOBID=emscripten-webgl2
     - TARGET=emscripten
@@ -180,6 +208,7 @@ install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ] && [ ! "$TARGET" == "desktop-sanitizers" ] && [ ! "$TARGET" == "android" ] && [ ! "$TARGET" == "desktop-vulkan" ]; then export CXX=g++-4.8; fi
 - if [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$TARGET" == "desktop-sanitizers" ]; then export CXX=clang++-3.8; fi
 - if [ "$BUILD_DEPRECATED" != "OFF" ]; then export BUILD_DEPRECATED=ON; fi
+- if [ "$BUILD_STATIC" != "ON" ]; then export BUILD_STATIC=OFF; fi
 - if [ "$TRAVIS_OS_NAME" == "linux" ] && ( [ "$TARGET" == "desktop" ] || [ "$TARGET" == "desktop-sanitizers" ] ); then export PLATFORM_GL_API=GLX; fi
 - if [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$TARGET" == "desktop-gles" ]; then export PLATFORM_GL_API=EGL; fi
 - if [ "$TRAVIS_OS_NAME" == "linux" ] && [ "$TARGET" == "android" ]; then wget -nc https://dl.google.com/android/repository/android-ndk-r16b-linux-x86_64.zip && unzip -q android-*.zip; fi
@@ -199,11 +228,11 @@ install:
 - if [ "$TARGET" == "desktop" ] || [ "$TARGET" == "desktop-sanitizers" ] || [ "$TARGET" == "desktop-gles" ]; then printf "[General]\ndrivers=null" > ~/.alsoftrc; fi
 
 # SDL on macOS and iOS (cached)
-- if [ "$TRAVIS_OS_NAME" == "osx" ] && [ "$TARGET" == "desktop" ]; then HOMEBREW_NO_AUTO_UPDATE=1 brew install sdl2; fi
+- if [ "$TRAVIS_OS_NAME" == "osx" ] && ( [ "$TARGET" == "desktop" ] || [ "$TARGET" == "desktop-vulkan" ] ); then HOMEBREW_NO_AUTO_UPDATE=1 brew install sdl2; fi
 - if [ "$TRAVIS_OS_NAME" == "osx" ] && [ "$TARGET" == "ios-simulator" ]; then curl -O https://www.libsdl.org/release/SDL2-2.0.4.tar.gz && tar -xzvf SDL2-2.0.4.tar.gz && cd SDL2-2.0.4/Xcode-iOS/SDL && xcodebuild -sdk iphonesimulator9.3 | xcpretty && mkdir -p ../../../sdl2/lib && cp build/Release-iphonesimulator/libSDL2.a ../../../sdl2/lib && mkdir -p ../../../sdl2/include/SDL2 && cp -R ../../include/* ../../../sdl2/include/SDL2 && cd ../../..; fi
 
 # GLFW (cached)
-- if [ "$TRAVIS_OS_NAME" == "osx" ] && [ "$TARGET" == "desktop" ]; then HOMEBREW_NO_AUTO_UPDATE=1 brew install glfw; fi
+- if [ "$TRAVIS_OS_NAME" == "osx" ] && ( [ "$TARGET" == "desktop" ] || [ "$TARGET" == "desktop-vulkan" ] ); then HOMEBREW_NO_AUTO_UPDATE=1 brew install glfw; fi
 
 # SwiftShader on Linux (cached). Taken from Chromium snapshot 587878
 # (swiftshader-bin Arch package).

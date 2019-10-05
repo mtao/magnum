@@ -119,6 +119,11 @@ WindowlessWglContext::WindowlessWglContext(const Configuration& configuration, G
     typedef HGLRC(WINAPI*PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC, HGLRC, const int*);
     const PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = reinterpret_cast<PFNWGLCREATECONTEXTATTRIBSARBPROC>( wglGetProcAddress(reinterpret_cast<LPCSTR>("wglCreateContextAttribsARB")));
 
+    /* Request debug context if --magnum-gpu-validation is enabled */
+    Configuration::Flags flags = configuration.flags();
+    if(magnumContext && magnumContext->internalFlags() & GL::Context::InternalFlag::GpuValidation)
+        flags |= Configuration::Flag::Debug;
+
     /* Optimistically choose core context first */
     const GLint contextAttributes[] = {
         #ifdef MAGNUM_TARGET_GLES
@@ -131,12 +136,12 @@ WindowlessWglContext::WindowlessWglContext(const Configuration& configuration, G
         #endif
         WGL_CONTEXT_MINOR_VERSION_ARB, 0,
         WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_ES2_PROFILE_BIT_EXT,
-        WGL_CONTEXT_FLAGS_ARB, GLint(configuration.flags()),
+        WGL_CONTEXT_FLAGS_ARB, GLint(flags),
         #else
         WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
         WGL_CONTEXT_MINOR_VERSION_ARB, 1,
         WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-        WGL_CONTEXT_FLAGS_ARB, GLint(configuration.flags()),
+        WGL_CONTEXT_FLAGS_ARB, GLint(flags),
         #endif
         0
     };
@@ -149,7 +154,7 @@ WindowlessWglContext::WindowlessWglContext(const Configuration& configuration, G
 
         const int fallbackContextAttributes[] = {
             /** @todo or keep the fwcompat? */
-            WGL_CONTEXT_FLAGS_ARB, GLint(configuration.flags() & ~Configuration::Flag::ForwardCompatible),
+            WGL_CONTEXT_FLAGS_ARB, GLint(flags & ~Configuration::Flag::ForwardCompatible),
             0
         };
         _context = wglCreateContextAttribsARB(_deviceContext, nullptr, fallbackContextAttributes);
@@ -176,7 +181,10 @@ WindowlessWglContext::WindowlessWglContext(const Configuration& configuration, G
         constexpr static const char intelVendorString[] = "Intel";
         constexpr static const char amdVendorString[] = "ATI Technologies Inc.";
         const char* const vendorString = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
-        if((std::strncmp(vendorString, nvidiaVendorString, sizeof(nvidiaVendorString)) == 0 ||
+        /* If context creation fails *really bad*, glGetString() may actually
+           return nullptr. Check for that to avoid crashes deep inside
+           strncmp() */
+        if(vendorString && (std::strncmp(vendorString, nvidiaVendorString, sizeof(nvidiaVendorString)) == 0 ||
             std::strncmp(vendorString, intelVendorString, sizeof(intelVendorString)) == 0 ||
             std::strncmp(vendorString, amdVendorString, sizeof(amdVendorString)) == 0) &&
             (!magnumContext || !magnumContext->isDriverWorkaroundDisabled("no-forward-compatible-core-context")))
@@ -185,7 +193,7 @@ WindowlessWglContext::WindowlessWglContext(const Configuration& configuration, G
             wglDeleteContext(_context);
             const int fallbackContextAttributes[] = {
                 /** @todo or keep the fwcompat? */
-                WGL_CONTEXT_FLAGS_ARB, GLint(configuration.flags() & ~Configuration::Flag::ForwardCompatible),
+                WGL_CONTEXT_FLAGS_ARB, GLint(flags & ~Configuration::Flag::ForwardCompatible),
                 0
             };
             _context = wglCreateContextAttribsARB(_deviceContext, nullptr, fallbackContextAttributes);

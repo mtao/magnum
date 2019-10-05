@@ -23,14 +23,18 @@
     DEALINGS IN THE SOFTWARE.
 */
 
+#include <Corrade/Containers/StridedArrayView.h>
 #include <Corrade/TestSuite/Tester.h>
 
 #include "Magnum/Image.h"
+#include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
+#include "Magnum/DebugTools/CompareImage.h"
 #include "Magnum/DebugTools/ForceRenderer.h"
 #include "Magnum/DebugTools/ResourceManager.h"
 #include "Magnum/DebugTools/ObjectRenderer.h"
 #include "Magnum/DebugTools/TextureImage.h"
+#include "Magnum/GL/Framebuffer.h"
 #include "Magnum/GL/CubeMapTexture.h"
 #include "Magnum/GL/Texture.h"
 #include "Magnum/Math/Range.h"
@@ -73,8 +77,9 @@ DebugTools::ResourceManager::instance().set("my",
         .setSize(5.0f)
         .setColor(Color3::fromHsv({120.0_degf, 1.0f, 0.7f})));
 
-// Create debug renderer for given object, use "my" options for it
-Vector3 force;
+Vector3 force; // taken as a reference, has to be kept in scope
+
+// Create debug renderer for given force, use "my" options for it
 new DebugTools::ForceRenderer3D(*object, {0.3f, 1.5f, -0.7f}, force, "my",
         &debugDrawables);
 /* [ForceRenderer] */
@@ -133,3 +138,18 @@ GL::BufferImage2D image = DebugTools::textureSubImage(texture,
 }
 #endif
 }
+
+struct Foo: TestSuite::Tester {
+void foo() {
+{
+GL::Framebuffer fb{{}};
+ImageView2D expected{PixelFormat::RGB8Unorm, {}};
+/* [CompareImage-pixels-rgb] */
+Image2D image = fb.read(fb.viewport(), {PixelFormat::RGBA8Unorm});
+
+CORRADE_COMPARE_AS(Containers::arrayCast<Color3ub>(image.pixels<Color4ub>()),
+    "expected.png", DebugTools::CompareImageToFile);
+/* [CompareImage-pixels-rgb] */
+}
+}
+};

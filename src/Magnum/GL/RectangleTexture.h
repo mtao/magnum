@@ -353,7 +353,7 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         Vector2i imageSize() { return DataHelper<2>::imageSize(*this, 0); }
 
         /**
-         * @brief Read texture to image
+         * @brief Read texture to an image
          *
          * See @ref Texture::image(Int, Image&) for more information.
          */
@@ -370,7 +370,18 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         Image2D image(Image2D&& image);
 
         /**
-         * @brief Read texture to buffer image
+         * @brief Read texture to an image view
+         *
+         * Compared to @ref image(Image2D&) the function reads the pixels into
+         * the memory provided by @p image, expecting it's not @cpp nullptr @ce
+         * and its size is the same as texture size.
+         */
+        void image(const MutableImageView2D& image) {
+            AbstractTexture::image<2>(0, image);
+        }
+
+        /**
+         * @brief Read texture to a buffer image
          *
          * See @ref Texture::image(Int, BufferImage&, BufferUsage) for more
          * information.
@@ -388,7 +399,7 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         BufferImage2D image(BufferImage2D&& image, BufferUsage usage);
 
         /**
-         * @brief Read compressed texture to image
+         * @brief Read compressed texture to an image
          *
          * See @ref Texture::compressedImage(Int, CompressedImage&) for more
          * information.
@@ -408,7 +419,19 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         CompressedImage2D compressedImage(CompressedImage2D&& image);
 
         /**
-         * @brief Read compressed texture to buffer image
+         * @brief Read compressed texture to an image view
+         *
+         * Compared to @ref compressedImage(CompressedImage2D&) the function
+         * reads the pixels into the memory provided by @p image, expecting
+         * it's not @cpp nullptr @ce, its format is the same as texture format
+         * and its size is the same as texture size.
+         */
+        void compressedImage(const MutableCompressedImageView2D& image) {
+            AbstractTexture::compressedImage<2>(0, image);
+        }
+
+        /**
+         * @brief Read compressed texture to a buffer image
          *
          * See @ref Texture::compressedImage(Int, CompressedBufferImage&, BufferUsage)
          * for more information.
@@ -428,7 +451,7 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         CompressedBufferImage2D compressedImage(CompressedBufferImage2D&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, Image&)
+         * @brief Read a texture range to an image
          *
          * See @ref Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, Image&)
          * for more information.
@@ -447,7 +470,18 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         Image2D subImage(const Range2Di& range, Image2D&& image);
 
         /**
-         * @brief @copybrief Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, BufferImage&, BufferUsage)
+         * @brief Read a range of given texture mip level to an image view
+         *
+         * Compared to @ref subImage(const Range2Di&, Image2D&) the function
+         * reads the pixels into the memory provided by @p image, expecting
+         * it's not @cpp nullptr @ce and its size is the same as @p range size.
+         */
+        void subImage(const Range2Di& range, const MutableImageView2D& image) {
+            AbstractTexture::subImage<2>(0, range, image);
+        }
+
+        /**
+         * @brief Read a texture range to a buffer image
          *
          * See @ref Texture::subImage(Int, const RangeTypeFor<dimensions, Int>&, BufferImage&, BufferUsage)
          * for more information.
@@ -466,7 +500,7 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         BufferImage2D subImage(const Range2Di& range, BufferImage2D&& image, BufferUsage usage);
 
         /**
-         * @brief @copybrief Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage&)
+         * @brief Read a compressed texture range to an image
          *
          * See @ref Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedImage&)
          * for more information.
@@ -491,7 +525,19 @@ class MAGNUM_GL_EXPORT RectangleTexture: public AbstractTexture {
         CompressedImage2D compressedSubImage(const Range2Di& range, CompressedImage2D&& image);
 
         /**
-         * @brief @copybrief Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedBufferImage&, BufferUsage)
+         * @brief Read a compressed texture range to an image view
+         *
+         * Compared to @ref compressedSubImage(const Range2Di&, CompressedImage2D&)
+         * the function reads the pixels into the memory provided by @p image,
+         * expecting it's not @cpp nullptr @ce, its format is the same as
+         * texture format and its size is the same as @p range size.
+         */
+        void compressedSubImage(const Range2Di& range, const MutableCompressedImageView2D& image) {
+            AbstractTexture::compressedSubImage<2>(0, range, image);
+        }
+
+        /**
+         * @brief Read a compressed texture range to a buffer image
          *
          * See @ref Texture::compressedSubImage(Int, const RangeTypeFor<dimensions, Int>&, CompressedBufferImage&, BufferUsage)
          * for more information.

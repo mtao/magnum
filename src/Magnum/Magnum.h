@@ -66,16 +66,13 @@ Defined if built as static libraries. Default are shared libraries.
 #define MAGNUM_BUILD_STATIC
 #undef MAGNUM_BUILD_STATIC
 
-/**
-@brief Multi-threaded build
-
-Defined if the library is built in a way that allows multiple thread-local
-Magnum contexts. Enabled by default.
-@see @ref building, @ref cmake,
-    @ref Magnum::GL::Context::current() "GL::Context::current()"
-*/
+#ifdef MAGNUM_BUILD_DEPRECATED
+/** @brief Multi-threaded build
+ * @deprecated Use @ref CORRADE_BUILD_MULTITHREADED instead.
+ */
 #define MAGNUM_BUILD_MULTITHREADED
 #undef MAGNUM_BUILD_MULTITHREADED
+#endif
 
 /**
 @brief OpenGL interoperability
@@ -498,22 +495,22 @@ typedef Math::Deg<Float> Deg;
 /** @brief Angle in float radians */
 typedef Math::Rad<Float> Rad;
 
-/** @brief Float 1D range */
+/** @brief One-dimensional float range */
 typedef Math::Range1D<Float> Range1D;
 
-/** @brief Float 2D range */
+/** @brief Two-dimensional float range */
 typedef Math::Range2D<Float> Range2D;
 
-/** @brief Float 3D range */
+/** @brief Three-dimensional float range */
 typedef Math::Range3D<Float> Range3D;
 
-/** @brief Signed integer 1D range */
+/** @brief One-dimensional signed integer range */
 typedef Math::Range1D<Int> Range1Di;
 
-/** @brief Signed integer 2D range */
+/** @brief Two-dimensional signed integer range */
 typedef Math::Range2D<Int> Range2Di;
 
-/** @brief Signed integer 3D range */
+/** @brief Three-dimensional signed integer range */
 typedef Math::Range3D<Int> Range3Di;
 
 /** @brief Float frustum */
@@ -698,13 +695,13 @@ typedef Math::Deg<Double> Degd;
 /** @brief Angle in double radians */
 typedef Math::Rad<Double> Radd;
 
-/** @brief Double 1D range */
+/** @brief One-dimensional double range */
 typedef Math::Range1D<Double> Range1Dd;
 
-/** @brief Double 2D range */
+/** @brief Two-dimensional double range */
 typedef Math::Range2D<Double> Range2Dd;
 
-/** @brief Double 3D range */
+/** @brief Three-dimensional double range */
 typedef Math::Range3D<Double> Range3Dd;
 
 /** @brief Double frustum */
@@ -730,15 +727,25 @@ typedef CompressedImage<1> CompressedImage1D;
 typedef CompressedImage<2> CompressedImage2D;
 typedef CompressedImage<3> CompressedImage3D;
 
-template<UnsignedInt> class ImageView;
-typedef ImageView<1> ImageView1D;
-typedef ImageView<2> ImageView2D;
-typedef ImageView<3> ImageView3D;
+template<UnsignedInt, class> class ImageView;
+template<UnsignedInt dimensions> using BasicImageView = ImageView<dimensions, const char>;
+typedef BasicImageView<1> ImageView1D;
+typedef BasicImageView<2> ImageView2D;
+typedef BasicImageView<3> ImageView3D;
+template<UnsignedInt dimensions> using BasicMutableImageView = ImageView<dimensions, char>;
+typedef BasicMutableImageView<1> MutableImageView1D;
+typedef BasicMutableImageView<2> MutableImageView2D;
+typedef BasicMutableImageView<3> MutableImageView3D;
 
-template<UnsignedInt> class CompressedImageView;
-typedef CompressedImageView<1> CompressedImageView1D;
-typedef CompressedImageView<2> CompressedImageView2D;
-typedef CompressedImageView<3> CompressedImageView3D;
+template<UnsignedInt, class> class CompressedImageView;
+template<UnsignedInt dimensions> using BasicCompressedImageView = CompressedImageView<dimensions, const char>;
+typedef BasicCompressedImageView<1> CompressedImageView1D;
+typedef BasicCompressedImageView<2> CompressedImageView2D;
+typedef BasicCompressedImageView<3> CompressedImageView3D;
+template<UnsignedInt dimensions> using BasicMutableCompressedImageView = CompressedImageView<dimensions, char>;
+typedef BasicMutableCompressedImageView<1> MutableCompressedImageView1D;
+typedef BasicMutableCompressedImageView<2> MutableCompressedImageView2D;
+typedef BasicMutableCompressedImageView<3> MutableCompressedImageView3D;
 
 enum class MeshPrimitive: UnsignedInt;
 enum class MeshIndexType: UnsignedInt;

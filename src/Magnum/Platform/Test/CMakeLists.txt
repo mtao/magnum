@@ -23,6 +23,10 @@
 #   DEALINGS IN THE SOFTWARE.
 #
 
+find_package(Corrade REQUIRED Main)
+
+set(ADDITIONAL_WEB_FILES "")
+
 if(WITH_ANDROIDAPPLICATION)
     add_library(PlatformAndroidApplicationTest SHARED AndroidApplicationTest.cpp)
     target_link_libraries(PlatformAndroidApplicationTest PRIVATE MagnumAndroidApplication)
@@ -32,10 +36,18 @@ if(WITH_ANDROIDAPPLICATION)
     endif()
 endif()
 
+if(WITH_EMSCRIPTENAPPLICATION)
+    add_executable(PlatformEmscriptenApplicationTest EmscriptenApplicationTest.cpp)
+    target_link_libraries(PlatformEmscriptenApplicationTest PRIVATE MagnumEmscriptenApplication MagnumGL)
+    set_target_properties(PlatformEmscriptenApplicationTest PROPERTIES FOLDER "Magnum/Platform/Test")
+    # So we can spin up a webserver in the build dir for easy testing
+    list(APPEND ADDITIONAL_WEB_FILES EmscriptenApplicationTest.html)
+endif()
+
 if(WITH_GLFWAPPLICATION)
-    add_executable(PlatformGlfwApplicationTest GlfwApplicationTest.cpp)
+    add_executable(PlatformGlfwApplicationTest WIN32 GlfwApplicationTest.cpp)
     # HiDPi.manifest not needed, as GLFW sets that on its own
-    target_link_libraries(PlatformGlfwApplicationTest PRIVATE MagnumGlfwApplication)
+    target_link_libraries(PlatformGlfwApplicationTest PRIVATE MagnumGlfwApplication Corrade::Main)
     set_target_properties(PlatformGlfwApplicationTest PROPERTIES FOLDER "Magnum/Platform/Test")
 endif()
 
@@ -46,7 +58,7 @@ if(WITH_GLXAPPLICATION)
 endif()
 
 if(WITH_SDL2APPLICATION)
-    add_executable(PlatformSdl2ApplicationTest Sdl2ApplicationTest.cpp)
+    add_executable(PlatformSdl2ApplicationTest WIN32 Sdl2ApplicationTest.cpp)
     if(CORRADE_TARGET_WINDOWS AND NOT CORRADE_TARGET_WINDOWS_RT)
         if(MSVC)
             target_sources(PlatformSdl2ApplicationTest PRIVATE WindowsHiDPI.manifest)
@@ -54,15 +66,10 @@ if(WITH_SDL2APPLICATION)
             target_sources(PlatformSdl2ApplicationTest PRIVATE WindowsHiDPI.rc)
         endif()
     endif()
-    target_link_libraries(PlatformSdl2ApplicationTest PRIVATE MagnumSdl2Application)
+    target_link_libraries(PlatformSdl2ApplicationTest PRIVATE MagnumSdl2Application Corrade::Main)
     set_target_properties(PlatformSdl2ApplicationTest PROPERTIES FOLDER "Magnum/Platform/Test")
     if(CORRADE_TARGET_EMSCRIPTEN)
-        # So we can spin up a webserver in the build dir for easy testing
-        file(COPY
-            ../EmscriptenApplication.js
-            ../WebApplication.css
-            Sdl2ApplicationTest.html
-            DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+        list(APPEND ADDITIONAL_WEB_FILES Sdl2ApplicationTest.html)
     elseif(CORRADE_TARGET_IOS OR CORRADE_TARGET_APPLE)
         # The plist is needed in order to mark the app as DPI-aware
         set_target_properties(PlatformSdl2ApplicationTest PROPERTIES
@@ -90,11 +97,9 @@ if(WITH_WINDOWLESSEGLAPPLICATION)
     set_target_properties(PlatformWindowlessEglApplicationTest PROPERTIES FOLDER "Magnum/Platform/Test")
     if(CORRADE_TARGET_EMSCRIPTEN)
         # So we can spin up a webserver in the build dir for easy testing
-        file(COPY
+        list(APPEND ADDITIONAL_WEB_FILES
             ../WindowlessEmscriptenApplication.js
-            ../WebApplication.css
-            WindowlessEglApplicationTest.html
-            DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+            WindowlessEglApplicationTest.html)
     endif()
 endif()
 
@@ -123,4 +128,14 @@ if(WITH_WINDOWLESSWINDOWSEGLAPPLICATION)
     add_executable(PlatformWindowlessWindowsEglApplicationTest WindowlessWindowsEglApplicationTest.cpp)
     target_link_libraries(PlatformWindowlessWindowsEglApplicationTest PRIVATE MagnumWindowlessWindowsEglApplication)
     set_target_properties(PlatformWindowlessWindowsEglApplicationTest PROPERTIES FOLDER "Magnum/Platform/Test")
+endif()
+
+if(WITH_EMSCRIPTENAPPLICATION OR (WITH_SDL2APPLICATION AND CORRADE_TARGET_EMSCRIPTEN))
+    list(APPEND ADDITIONAL_WEB_FILES ../EmscriptenApplication.js)
+endif()
+
+if(WITH_EMSCRIPTENAPPLICATION OR (WITH_SDL2APPLICATION AND CORRADE_TARGET_EMSCRIPTEN) OR WITH_WINDOWLESSWINDOWSEGLAPPLICATION)
+    # So we can spin up a webserver in the build dir for easy testing
+    file(COPY ../WebApplication.css ${ADDITIONAL_WEB_FILES}
+        DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()

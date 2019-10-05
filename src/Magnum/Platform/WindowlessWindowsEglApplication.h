@@ -52,6 +52,8 @@ namespace Magnum { namespace Platform {
 /**
 @brief Windowless Windows/EGL context
 
+@m_keywords{WindowlessGLContext}
+
 GL context using pure WINAPI and EGL, used in @ref WindowlessWindowsEglApplication.
 It is built if `WITH_WINDOWLESSWINDOWSEGLAPPLICATION` is enabled in CMake.
 
@@ -138,10 +140,15 @@ class WindowlessWindowsEglContext::Configuration {
         /**
          * @brief Context flag
          *
-         * @see @ref Flags, @ref setFlags(), @ref Context::Flag
+         * @see @ref Flags, @ref setFlags(), @ref GL::Context::Flag
          */
         enum class Flag: int {
-            Debug = EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR    /**< Create debug context */
+            /**
+             * Debug context. Enabled automatically if the
+             * `--magnum-gpu-validation` @ref GL-Context-command-line "command-line option"
+             * is present.
+             */
+            Debug = EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR
         };
 
         /**
@@ -205,6 +212,8 @@ CORRADE_ENUMSET_OPERATORS(WindowlessWindowsEglContext::Configuration::Flags)
 
 /**
 @brief Windowless Windows/EGL application
+
+@m_keywords{WindowlessApplication}
 
 Application for offscreen rendering using @ref WindowlessWindowsEglContext.
 This application library is available on OpenGL ES (also ANGLE) on Windows. It

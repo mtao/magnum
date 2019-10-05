@@ -70,12 +70,22 @@ Int BufferTexture::offsetAlignment() {
     return value;
 }
 
+Int BufferTexture::size() {
+    /* Can't use DataHelper<1>::imageSize(*this, 0)[0] because for 1D textures
+       it's not defined on ES */
+    Int size;
+    (this->*Context::current().state().texture->getLevelParameterivImplementation)(0, GL_TEXTURE_WIDTH, &size);
+    return size;
+}
+
 BufferTexture& BufferTexture::setBuffer(const BufferTextureFormat internalFormat, Buffer& buffer) {
+    buffer.createIfNotAlready();
     (this->*Context::current().state().texture->setBufferImplementation)(internalFormat, buffer);
     return *this;
 }
 
 BufferTexture& BufferTexture::setBuffer(const BufferTextureFormat internalFormat, Buffer& buffer, const GLintptr offset, const GLsizeiptr size) {
+    buffer.createIfNotAlready();
     (this->*Context::current().state().texture->setBufferRangeImplementation)(internalFormat, buffer, offset, size);
     return *this;
 }

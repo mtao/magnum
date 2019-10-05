@@ -82,16 +82,17 @@ Sdl2Application::Sdl2Application(const Arguments& arguments, NoCreateT):
     #ifndef CORRADE_TARGET_EMSCRIPTEN
     _minimalLoopPeriod{0},
     #endif
-    #ifdef MAGNUM_TARGET_GL
-    _glContext{nullptr},
-    #endif
     _flags{Flag::Redraw}
 {
     Utility::Arguments args{Implementation::windowScalingArguments()};
     #ifdef MAGNUM_TARGET_GL
     _context.reset(new GLContext{NoCreate, args, arguments.argc, arguments.argv});
     #else
-    args.parse(arguments.argc, arguments.argv);
+    /** @todo this is duplicated here and in Sdl2Application, figure out a nice
+        non-duplicated way to handle this */
+    args.addOption("log", "default").setHelp("log", "console logging", "default|quiet|verbose")
+        .setFromEnvironment("log")
+        .parse(arguments.argc, arguments.argv);
     #endif
 
     /* Available since 2.0.4, disables interception of SIGINT and SIGTERM so
@@ -264,17 +265,27 @@ Vector2 Sdl2Application::dpiScaling(const Configuration& configuration) const {
     #endif
 }
 
+void Sdl2Application::setWindowTitle(const std::string& title) {
+    #ifndef CORRADE_TARGET_EMSCRIPTEN
+    SDL_SetWindowTitle(_window, title.data());
+    #else
+    /* We don't have the _window because SDL_CreateWindow() doesn't exist in
+       the SDL1/2 hybrid. But it's not used anyway, so pass nullptr there. */
+    SDL_SetWindowTitle(nullptr, title.data());
+    #endif
+}
+
 bool Sdl2Application::tryCreate(const Configuration& configuration) {
     #ifdef MAGNUM_TARGET_GL
     if(!(configuration.windowFlags() & Configuration::WindowFlag::Contextless))
         return tryCreate(configuration, GLConfiguration{});
     #endif
 
+    #ifndef CORRADE_TARGET_EMSCRIPTEN
     /* Scale window based on DPI */
     _dpiScaling = dpiScaling(configuration);
     const Vector2i scaledWindowSize = configuration.size()*_dpiScaling;
 
-    #ifndef CORRADE_TARGET_EMSCRIPTEN
     /* Create window */
     if(!(_window = SDL_CreateWindow(
         #ifndef CORRADE_TARGET_IOS
@@ -289,10 +300,50 @@ bool Sdl2Application::tryCreate(const Configuration& configuration) {
         Error() << "Platform::Sdl2Application::tryCreate(): cannot create window:" << SDL_GetError();
         return false;
     }
-    #else
+
     /* Emscripten-specific initialization */
-    if(!(_glContext = SDL_SetVideoMode(scaledWindowSize.x(), scaledWindowSize.y(), 24, SDL_OPENGL|SDL_HWSURFACE|SDL_DOUBLEBUF))) {
-        Error() << "Platform::Sdl2Application::tryCreate(): cannot create window:" << SDL_GetError();
+    #else
+    /* Get CSS canvas size. This is used later to detect canvas resizes and
+       fire viewport events, because Emscripten doesn't do that. Related info:
+       https://github.com/kripken/emscripten/issues/1731 */
+    /** @todo don't hardcode "#canvas" here, make it configurable from outside */
+    {
+        Vector2d canvasSize;
+        /* Emscripten 1.38.27 changed to generic CSS selectors from element
+           IDs depending on -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=1
+           being set (which we can't detect at compile time). Fortunately,
+           using #canvas works the same way both in the previous versions and
+           the current one. Unfortunately, this is also the only value that
+           works the same way for both. Further details at
+           https://github.com/emscripten-core/emscripten/pull/7977 */
+        emscripten_get_element_css_size("#canvas", &canvasSize.x(), &canvasSize.y());
+        _lastKnownCanvasSize = Vector2i{canvasSize};
+    }
+
+    /* By default Emscripten creates a 300x150 canvas. That's so freaking
+       random I'm getting mad. Use the real (CSS pixels) canvas size instead,
+       if the size is not hardcoded from the configuration. This is then
+       multiplied by the DPI scaling. */
+    Vector2i windowSize;
+    if(!configuration.size().isZero()) {
+        windowSize = configuration.size();
+    } else {
+        windowSize = _lastKnownCanvasSize;
+        Debug{_verboseLog ? Debug::output() : nullptr} << "Platform::Sdl2Application::tryCreate(): autodetected canvas size" << windowSize;
+    }
+    _dpiScaling = dpiScaling(configuration);
+    const Vector2i scaledWindowSize = windowSize*_dpiScaling;
+
+    Uint32 flags = SDL_OPENGL|SDL_HWSURFACE|SDL_DOUBLEBUF;
+    if(configuration.windowFlags() & Configuration::WindowFlag::Resizable) {
+        _flags |= Flag::Resizable;
+        /* Actually not sure if this makes any difference:
+           https://github.com/kripken/emscripten/issues/1731 */
+        flags |= SDL_RESIZABLE;
+    }
+
+    if(!(_surface = SDL_SetVideoMode(scaledWindowSize.x(), scaledWindowSize.y(), 24, flags))) {
+        Error() << "Platform::Sdl2Application::tryCreate(): cannot create context:" << SDL_GetError();
         return false;
     }
     #endif
@@ -328,6 +379,11 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
     _dpiScaling = dpiScaling(configuration);
     const Vector2i scaledWindowSize = configuration.size()*_dpiScaling;
 
+    /* Request debug context if --magnum-gpu-validation is enabled */
+    GLConfiguration::Flags glFlags = glConfiguration.flags();
+    if(_context->internalFlags() & GL::Context::InternalFlag::GpuValidation)
+        glFlags |= GLConfiguration::Flag::Debug;
+
     /* Set context version, if user-specified */
     if(glConfiguration.version() != GL::Version::None) {
         Int major, minor;
@@ -342,7 +398,7 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
         #endif
 
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, int(glConfiguration.flags()));
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, int(glFlags));
 
     /* Request usable version otherwise */
     } else {
@@ -359,7 +415,7 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
         #endif
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, int(glConfiguration.flags()));
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, int(glFlags));
         #else
         /* For ES the major context version is compile-time constant */
         #ifdef MAGNUM_TARGET_GLES3
@@ -410,9 +466,12 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
     #endif
     if(glConfiguration.version() == GL::Version::None && (!_glContext
         #ifndef CORRADE_TARGET_APPLE
-        /* Sorry about the UGLY code, HOPEFULLY THERE WON'T BE MORE WORKAROUNDS */
+        /* If context creation fails *really bad*, glGetString() may actually
+           return nullptr. Check for that to avoid crashes deep inside
+           strncmp(). Sorry about the UGLY code, HOPEFULLY THERE WON'T BE MORE
+           WORKAROUNDS */
         || (vendorString = reinterpret_cast<const char*>(glGetString(GL_VENDOR)),
-        (std::strncmp(vendorString, nvidiaVendorString, sizeof(nvidiaVendorString)) == 0 ||
+        vendorString && (std::strncmp(vendorString, nvidiaVendorString, sizeof(nvidiaVendorString)) == 0 ||
          #ifdef CORRADE_TARGET_WINDOWS
          std::strncmp(vendorString, intelVendorString, sizeof(intelVendorString)) == 0 ||
          #endif
@@ -433,7 +492,7 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
         /** @todo or keep the fwcompat? */
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, int(glConfiguration.flags() & ~GLConfiguration::Flag::ForwardCompatible));
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, int(glFlags) & int(~GLConfiguration::Flag::ForwardCompatible));
 
         if(!(_window = SDL_CreateWindow(configuration.title().data(),
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -509,7 +568,7 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
         flags |= SDL_RESIZABLE;
     }
 
-    if(!(_glContext = SDL_SetVideoMode(scaledWindowSize.x(), scaledWindowSize.y(), 24, flags))) {
+    if(!(_surface = SDL_SetVideoMode(scaledWindowSize.x(), scaledWindowSize.y(), 24, flags))) {
         Error() << "Platform::Sdl2Application::tryCreate(): cannot create context:" << SDL_GetError();
         return false;
     }
@@ -522,7 +581,7 @@ bool Sdl2Application::tryCreate(const Configuration& configuration, const GLConf
         SDL_DestroyWindow(_window);
         _window = nullptr;
         #else
-        SDL_FreeSurface(_glContext);
+        SDL_FreeSurface(_surface);
         #endif
         return false;
     }
@@ -544,7 +603,7 @@ Vector2i Sdl2Application::windowSize() const {
     CORRADE_ASSERT(_window, "Platform::Sdl2Application::windowSize(): no window opened", {});
     SDL_GetWindowSize(_window, &size.x(), &size.y());
     #else
-    CORRADE_ASSERT(_glContext, "Platform::Sdl2Application::windowSize(): no window opened", {});
+    CORRADE_ASSERT(_surface, "Platform::Sdl2Application::windowSize(): no window opened", {});
     emscripten_get_canvas_element_size("#canvas", &size.x(), &size.y());
     #endif
     return size;
@@ -569,7 +628,7 @@ Vector2i Sdl2Application::framebufferSize() const {
     CORRADE_ASSERT(_window, "Platform::Sdl2Application::framebufferSize(): no window opened", {});
     SDL_GL_GetDrawableSize(_window, &size.x(), &size.y());
     #else
-    CORRADE_ASSERT(_glContext, "Platform::Sdl2Application::framebufferSize(): no window opened", {});
+    CORRADE_ASSERT(_surface, "Platform::Sdl2Application::framebufferSize(): no window opened", {});
     emscripten_get_canvas_element_size("#canvas", &size.x(), &size.y());
     #endif
     return size;
@@ -589,7 +648,7 @@ void Sdl2Application::swapBuffers() {
     #ifndef CORRADE_TARGET_EMSCRIPTEN
     SDL_GL_SwapWindow(_window);
     #else
-    SDL_Flip(_glContext);
+    SDL_Flip(_surface);
     #endif
 }
 
@@ -621,7 +680,7 @@ Sdl2Application::~Sdl2Application() {
     #ifndef CORRADE_TARGET_EMSCRIPTEN
     SDL_GL_DeleteContext(_glContext);
     #else
-    SDL_FreeSurface(_glContext);
+    SDL_FreeSurface(_surface);
     #endif
     #endif
 
@@ -674,7 +733,11 @@ void Sdl2Application::mainLoopIteration() {
             _lastKnownCanvasSize = canvasSizei;
             const Vector2i size = _dpiScaling*canvasSizei;
             emscripten_set_canvas_element_size("#canvas", size.x(), size.y());
-            ViewportEvent e{size, size, _dpiScaling};
+            ViewportEvent e{
+                #ifdef MAGNUM_TARGET_GL
+                size,
+                #endif
+                size, _dpiScaling};
             viewportEvent(e);
             _flags |= Flag::Redraw;
         }

@@ -3,6 +3,7 @@
 
     Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019
               Vladimír Vondruš <mosra@centrum.cz>
+    Copyright © 2019 Daniel Guzman <daniel.guzman85@gmail.com>
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -34,6 +35,7 @@ namespace Magnum { namespace Test { namespace {
 struct ResourceManagerTest: TestSuite::Tester {
     explicit ResourceManagerTest();
 
+    void compare();
     void state();
     void stateFallback();
     void stateDisallowed();
@@ -63,7 +65,8 @@ typedef Magnum::ResourceManager<Int, Data> ResourceManager;
 size_t Data::count = 0;
 
 ResourceManagerTest::ResourceManagerTest() {
-    addTests({&ResourceManagerTest::state,
+    addTests({&ResourceManagerTest::compare,
+              &ResourceManagerTest::state,
               &ResourceManagerTest::stateFallback,
               &ResourceManagerTest::stateDisallowed,
               &ResourceManagerTest::basic,
@@ -78,6 +81,37 @@ ResourceManagerTest::ResourceManagerTest() {
               &ResourceManagerTest::loaderSetNullptr,
 
               &ResourceManagerTest::debugResourceState});
+}
+
+void ResourceManagerTest::compare() {
+    ResourceManager rm1;
+
+    ResourceKey resKeyA("keyA");
+    ResourceKey resKeyB("keyB");
+    rm1.set(resKeyA, 1);
+    rm1.set(resKeyB, 0);
+
+    Resource<Int> resA1 = rm1.get<Int>(resKeyA);
+    Resource<Int> resA2 = rm1.get<Int>(resKeyA);
+    Resource<Int> resB = rm1.get<Int>(resKeyB);
+
+    CORRADE_VERIFY(resA1 == resA1);
+    CORRADE_VERIFY(resA1 == resA2);
+    CORRADE_VERIFY(resA1 != resB);
+
+    Magnum::ResourceManager<Int, Float> rm2;
+    rm2.set(resKeyA, 1);
+    rm2.set(resKeyA, 1.0f);
+
+    Resource<Int> resAOther = rm2.get<Int>(resKeyA);
+    Resource<Float> resADifferentType = rm2.get<Float>(resKeyA);
+    /* Verify it checks for manager equality as well */
+    CORRADE_VERIFY(resA1 != resAOther);
+    /* If the comparison operator wouldn't be deleted, the implicit conversion
+       would kick in and then 1.0f == 1.0f, which is wrong. With the deleted
+       operator this doesn't compile. */
+    //CORRADE_VERIFY(resA1 != resADifferentType);
+    //CORRADE_VERIFY(!(resA1 == resADifferentType));
 }
 
 void ResourceManagerTest::state() {
@@ -282,7 +316,7 @@ void ResourceManagerTest::clearWhileReferenced() {
 void ResourceManagerTest::loader() {
     class IntResourceLoader: public AbstractResourceLoader<Int> {
         public:
-            IntResourceLoader(): resource(ResourceManager::instance().get<Data>("data")) {}
+            IntResourceLoader(ResourceManager& instance): resource{instance.get<Data>("data")} {}
 
             void load() {
                 set("hello", Containers::pointer<Int>(773), ResourceDataState::Final, ResourcePolicy::Resident);
@@ -304,7 +338,7 @@ void ResourceManagerTest::loader() {
 
     {
         ResourceManager rm;
-        Containers::Pointer<IntResourceLoader> loaderPtr{Containers::InPlaceInit};
+        Containers::Pointer<IntResourceLoader> loaderPtr{Containers::InPlaceInit, rm};
         IntResourceLoader& loader = *loaderPtr;
         rm.setLoader<Int>(std::move(loaderPtr));
 

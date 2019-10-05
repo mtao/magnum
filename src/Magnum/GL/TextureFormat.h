@@ -29,7 +29,13 @@
  * @brief Enum @ref Magnum::GL::TextureFormat
  */
 
+#include "Magnum/Magnum.h"
 #include "Magnum/GL/OpenGL.h"
+#include "Magnum/GL/visibility.h"
+
+#ifdef MAGNUM_BUILD_DEPRECATED
+#include <Corrade/Utility/Macros.h>
+#endif
 
 namespace Magnum { namespace GL {
 
@@ -43,7 +49,8 @@ color format is then @ref PixelFormat::Red, @ref PixelFormat::RGB or
 documentation of these values for possible limitations when using OpenGL ES 2.0
 or WebGL.
 
-@see @ref Texture, @ref CubeMapTexture, @ref CubeMapTextureArray
+@see @ref textureFormat(), @ref hasTextureFormat(), @ref Texture,
+    @ref CubeMapTexture, @ref CubeMapTextureArray
 @m_enum_values_as_keywords
 */
 enum class TextureFormat: GLenum {
@@ -82,9 +89,7 @@ enum class TextureFormat: GLenum {
     #else
     R8 = GL_R8_EXT,
     #endif
-    #endif
 
-    #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
     /**
      * Red and green component, normalized unsigned, size
      * implementation-dependent. Not allowed in unemulated
@@ -122,13 +127,16 @@ enum class TextureFormat: GLenum {
     #endif
 
     /**
-     * RGB, normalized unsigned, size implementation-dependent. Not allowed in
-     * unemulated @ref Texture::setStorage() "*Texture::setStorage()" calls, in
+     * RGB, type/size implementation-dependent. Not allowed in unemulated
+     * @ref Texture::setStorage() "*Texture::setStorage()" calls, in
      * that case use @ref TextureFormat::RGB8 "TextureFormat::RGB8" instead.
      * @requires_gl Can't be used as a render target in OpenGL ES or WebGL. See
      *      @ref TextureFormat::RGBA for an alternative.
      * @deprecated_gl Prefer to use the exactly specified version of this
      *      format, e.g. @ref TextureFormat::RGB8.
+     * @requires_webgl20 Extension @webgl_extension{OES,texture_half_float_linear}
+     *      for filtering @ref PixelType::HalfFloat textures using
+     *      @ref SamplerFilter::Linear in WebGL 1.0.
      */
     RGB = GL_RGB,
 
@@ -150,11 +158,14 @@ enum class TextureFormat: GLenum {
     #endif
 
     /**
-     * RGBA, normalized unsigned, size implementation-dependent. Not allowed in
-     * unemulated @ref Texture::setStorage() "*Texture::setStorage()" calls, in
-     * that case use @ref TextureFormat::RGBA8 "TextureFormat::RGBA8" instead.
+     * RGBA, type/size implementation-dependent. Not allowed in unemulated
+     * @ref Texture::setStorage() "*Texture::setStorage()" calls, in that case
+     * use @ref TextureFormat::RGBA8 "TextureFormat::RGBA8" instead.
      * @deprecated_gl Prefer to use the exactly specified version of this
      *      format, e.g. @ref TextureFormat::RGBA8.
+     * @requires_webgl20 Extension @webgl_extension{OES,texture_half_float_linear}
+     *      for filtering @ref PixelType::HalfFloat textures using
+     *      @ref SamplerFilter::Linear in WebGL 1.0.
      */
     RGBA = GL_RGBA,
 
@@ -172,6 +183,98 @@ enum class TextureFormat: GLenum {
     RGBA8 = GL_RGBA8,
     #else
     RGBA8 = GL_RGBA8_OES,
+    #endif
+    #endif
+
+    #ifndef MAGNUM_TARGET_WEBGL
+    /**
+     * sRGB-encoded red component, normalized unsigned byte.
+     * @requires_extension Extension @gl_extension{EXT,texture_sRGB_R8}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_sRGB_R8}
+     * @requires_gles One- and two-component sRGB texture formats are not
+     *      available in WebGL, use @ref TextureFormat::SRGB8 or
+     *      @ref TextureFormat::SRGB8Alpha8
+     */
+    SR8 = GL_SR8_EXT,
+
+    #if defined(MAGNUM_TARGET_GLES) || defined(DOXYGEN_GENERATING_OUTPUT)
+    /**
+     * sRGB-encoded red and green component, normalized unsigned byte.
+     * @requires_es_extension Extension @gl_extension{EXT,texture_sRGB_RG8}
+     * @requires_gles One- and two-component sRGB texture formats are not
+     *      available in WebGL, use @ref TextureFormat::SRGB8 or
+     *      @ref TextureFormat::SRGB8Alpha8 instead. Only
+     *      @ref TextureFormat::SR8, @ref TextureFormat::SRGB8 or
+     *      @ref TextureFormat::SRGB8Alpha8 is available in desktop OpenGL.
+     */
+    SRG8 = GL_SRG8_EXT,
+    #endif
+    #endif
+
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
+    /**
+     * sRGB, normalized unsigned, size implementation-dependent. Not allowed in
+     * unemulated @ref Texture::setStorage() "*Texture::setStorage()" calls, in
+     * that case use @ref TextureFormat::SRGB8 "TextureFormat::SRGB8" instead.
+     * @requires_es_extension Extension @gl_extension{EXT,sRGB} in OpenGL ES 2.0.
+     *      Use @ref TextureFormat::SRGB8 in OpenGL ES 3.0 instead.
+     * @requires_webgl_extension Extension @webgl_extension{EXT,sRGB} in WebGL
+     *      1.0. Use @ref TextureFormat::SRGB8 in WebGL 2.0 instead.
+     * @deprecated_gl Prefer to use the exactly specified version of this
+     *      format, i.e. @ref TextureFormat::SRGB8.
+     */
+    #ifndef MAGNUM_TARGET_GLES
+    SRGB = GL_SRGB,
+    #else
+    SRGB = GL_SRGB_EXT,
+    #endif
+    #endif
+
+    #ifndef MAGNUM_TARGET_GLES2
+    /**
+     * sRGB, each component normalized unsigned byte.
+     * @requires_gles30 Use @ref TextureFormat::SRGB in OpenGL ES 2.0 instead.
+     * @requires_gl Can't be used as render target in OpenGL ES. Use
+     *      @ref TextureFormat::SRGB8Alpha8 instead.
+     * @requires_webgl20 Use @ref TextureFormat::SRGB in WebGL 1.0 instead.
+     */
+    SRGB8 = GL_SRGB8, /* NV_sRGB_formats has this on ES2, but meh */
+    #endif
+
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
+    /**
+     * sRGB + linear alpha, normalized unsigned, size implementation-dependent.
+     * Not allowed in unemulated @ref Texture::setStorage() "*Texture::setStorage()"
+     * calls, in that case use @ref TextureFormat::SRGB8Alpha8 "TextureFormat::SRGB8Alpha8"
+     * instead.
+     * @requires_es_extension Extension @gl_extension{EXT,sRGB} in OpenGL ES
+     *      2.0. Use @ref TextureFormat::SRGB8Alpha8 in OpenGL ES 3.0 instead.
+     * @requires_webgl_extension Extension @webgl_extension{EXT,sRGB} in WebGL
+     *      1.0. Use @ref TextureFormat::SRGB8Alpha8 in WebGL 2.0 instead.
+     * @deprecated_gl Prefer to use the exactly specified version of this
+     *      format, i.e. @ref TextureFormat::SRGB8Alpha8.
+     */
+    #ifndef MAGNUM_TARGET_GLES
+    SRGBAlpha = GL_SRGB_ALPHA,
+    #else
+    SRGBAlpha = GL_SRGB_ALPHA_EXT,
+    #endif
+    #endif
+
+    #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
+    /**
+     * sRGB + linear alpha, each component normalized unsigned byte.
+     * @requires_gles30 Extension @gl_extension{EXT,sRGB} and
+     *      @gl_extension{EXT,texture_storage}, only for
+     *      @ref Texture::setStorage() "*Texture::setStorage()" calls,
+     *      otherwise use @ref TextureFormat::SRGBAlpha in OpenGL ES 2.0
+     *      instead.
+     * @requires_webgl20 Use @ref TextureFormat::SRGBAlpha in WebGL 1.0 instead.
+     */
+    #ifndef MAGNUM_TARGET_GLES2
+    SRGB8Alpha8 = GL_SRGB8_ALPHA8,
+    #else
+    SRGB8Alpha8 = GL_SRGB8_ALPHA8_EXT, /* Not in spec, works at least on NV */
     #endif
     #endif
 
@@ -612,8 +715,6 @@ enum class TextureFormat: GLenum {
      * @requires_webgl20 Use @ref TextureFormat::RGB in combination with
      *      @ref PixelFormat::HalfFloat (@webgl_extension{OES,texture_half_float})
      *      in WebGL 1.0 instead.
-     * @requires_webgl20 Extension @webgl_extension{OES,texture_half_float_linear}
-     *      for filtering using @ref SamplerFilter::Linear in WebGL 1.0.
      * @requires_gl Can't be used as a render target in OpenGL ES or WebGL 2.0.
      *      Use @ref TextureFormat::RGBA16F instead. Use @ref TextureFormat::RGB
      *      in combination with @ref PixelFormat::HalfFloat
@@ -637,8 +738,6 @@ enum class TextureFormat: GLenum {
      * @requires_webgl20 Use @ref TextureFormat::RGBA in combination with
      *      @ref PixelFormat::HalfFloat (@webgl_extension{OES,texture_half_float})
      *      in WebGL 1.0 instead.
-     * @requires_webgl20 Extension @webgl_extension{OES,texture_half_float_linear}
-     *      for filtering using @ref SamplerFilter::Linear in WebGL 1.0.
      * @requires_webgl_extension Extension @webgl_extension{EXT,color_buffer_float}
      *      to use as a render target in WebGL 2.0. Use @ref TextureFormat::RGBA16UI
      *      or @ref TextureFormat::RGBA16I instead if not available. Use
@@ -772,7 +871,15 @@ enum class TextureFormat: GLenum {
      * RGB, normalized unsigned, red and green component 3bit, blue 2bit.
      * @requires_gl Packed 8bit types are not available in OpenGL ES or WebGL.
      */
-    R3B3G2 = GL_R3_G3_B2,
+    R3G3B2 = GL_R3_G3_B2,
+
+    #ifdef MAGNUM_BUILD_DEPRECATED
+    /** RGB, normalized unsigned, red and green component 3bit, blue 2bit.
+     * @deprecated This one had a misleading typo in the name, use
+     *      @ref TextureFormat::R3G3B2 instead.
+     */
+    R3B3G2 CORRADE_DEPRECATED_ENUM("use R3G3B2 instead") = R3G3B2,
+    #endif
 
     /**
      * RGB, each component normalized unsigned 4bit.
@@ -844,43 +951,6 @@ enum class TextureFormat: GLenum {
     RGB9E5 = GL_RGB9_E5,
     #endif
 
-    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
-    /**
-     * sRGB, normalized unsigned, size implementation-dependent. Not allowed in
-     * unemulated @ref Texture::setStorage() "*Texture::setStorage()" calls, in
-     * that case use @ref TextureFormat::SRGB8 "TextureFormat::SRGB8" instead.
-     * @requires_es_extension Extension @gl_extension{EXT,sRGB} in OpenGL ES 2.0.
-     *      Use @ref TextureFormat::SRGB8 in OpenGL ES 3.0 instead.
-     * @requires_webgl_extension Extension @webgl_extension{EXT,sRGB} in WebGL
-     *      1.0. Use @ref TextureFormat::SRGB8 in WebGL 2.0 instead.
-     * @deprecated_gl Prefer to use the exactly specified version of this
-     *      format, i.e. @ref TextureFormat::SRGB8.
-     */
-    #ifndef MAGNUM_TARGET_GLES
-    SRGB = GL_SRGB,
-    #else
-    SRGB = GL_SRGB_EXT,
-    #endif
-    #endif
-
-    #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
-    /**
-     * sRGB, each component normalized unsigned byte.
-     * @requires_gles30 Extension @gl_extension{EXT,sRGB} and
-     *      @gl_extension{EXT,texture_storage}, only for
-     *      @ref Texture::setStorage() "*Texture::setStorage()" calls,
-     *      otherwise use @ref TextureFormat::SRGB in OpenGL ES 2.0 instead.
-     * @requires_gl Can't be used as render target in OpenGL ES. Use
-     *      @ref TextureFormat::SRGB8Alpha8 instead.
-     * @requires_webgl20 Use @ref TextureFormat::SRGB in WebGL 1.0 instead.
-     */
-    #ifndef MAGNUM_TARGET_GLES2
-    SRGB8 = GL_SRGB8,
-    #else
-    SRGB8 = 0x8C41, /* Not in any spec, but seems to work at least on NV */
-    #endif
-    #endif
-
     #ifndef MAGNUM_TARGET_GLES
     /**
      * RGBA, normalized unsigned, each component 2bit.
@@ -948,43 +1018,6 @@ enum class TextureFormat: GLenum {
     RGBA12 = GL_RGBA12,
     #endif
 
-    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
-    /**
-     * sRGB + linear alpha, normalized unsigned, size implementation-dependent.
-     * Not allowed in unemulated @ref Texture::setStorage() "*Texture::setStorage()"
-     * calls, in that case use @ref TextureFormat::SRGB8Alpha8 "TextureFormat::SRGB8Alpha8"
-     * instead.
-     * @requires_es_extension Extension @gl_extension{EXT,sRGB} in OpenGL ES
-     *      2.0. Use @ref TextureFormat::SRGB8Alpha8 in OpenGL ES 3.0 instead.
-     * @requires_webgl_extension Extension @webgl_extension{EXT,sRGB} in WebGL
-     *      1.0. Use @ref TextureFormat::SRGB8Alpha8 in WebGL 2.0 instead.
-     * @deprecated_gl Prefer to use the exactly specified version of this
-     *      format, i.e. @ref TextureFormat::SRGB8Alpha8.
-     */
-    #ifndef MAGNUM_TARGET_GLES
-    SRGBAlpha = GL_SRGB_ALPHA,
-    #else
-    SRGBAlpha = GL_SRGB_ALPHA_EXT,
-    #endif
-    #endif
-
-    #if !(defined(MAGNUM_TARGET_WEBGL) && defined(MAGNUM_TARGET_GLES2))
-    /**
-     * sRGB + linear alpha, each component normalized unsigned byte.
-     * @requires_gles30 Extension @gl_extension{EXT,sRGB} and
-     *      @gl_extension{EXT,texture_storage}, only for
-     *      @ref Texture::setStorage() "*Texture::setStorage()" calls,
-     *      otherwise use @ref TextureFormat::SRGBAlpha in OpenGL ES 2.0
-     *      instead.
-     * @requires_webgl20 Use @ref TextureFormat::SRGBAlpha in WebGL 1.0 instead.
-     */
-    #ifndef MAGNUM_TARGET_GLES2
-    SRGB8Alpha8 = GL_SRGB8_ALPHA8,
-    #else
-    SRGB8Alpha8 = GL_SRGB8_ALPHA8_EXT, /* Not in spec, works at least on NV */
-    #endif
-    #endif
-
     #ifndef MAGNUM_TARGET_GLES
     /**
      * Compressed red channel, normalized unsigned. **Not available on
@@ -1019,78 +1052,148 @@ enum class TextureFormat: GLenum {
      *      or WebGL.
      */
     CompressedRGBA = GL_COMPRESSED_RGBA,
+    #endif
 
+    #if !defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     /**
-     * RGTC compressed red channel, normalized unsigned. **Available only on
-     * 2D, 2D array, cube map and cube map array textures.**
+     * RGTC compressed red channel, normalized unsigned. Equivalent to the old
+     * @def_gl{COMPRESSED_LUMINANCE_LATC1_EXT} from
+     * @gl_extension{EXT,texture_compression_latc}, only using the red channel
+     * instead of all three. **Available only on 2D, 2D array, cube map and
+     * cube map array textures.**
      * @requires_gl30 Extension @gl_extension{EXT,texture_compression_rgtc}
-     * @requires_gl Generic texture compression is not available in OpenGL ES
-     *      or WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_rgtc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_rgtc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedRedRgtc1 = GL_COMPRESSED_RED_RGTC1,
+    #else
+    CompressedRedRgtc1 = GL_COMPRESSED_RED_RGTC1_EXT,
+    #endif
 
     /**
-     * RGTC compressed red and green channel, normalized unsigned. **Available
-     * only on 2D, 2D array, cube map and cube map array textures.**
+     * RGTC compressed red and green channel, normalized unsigned. Equivalent
+     * to the old @def_gl{COMPRESSED_LUMINANCE_ALPHA_LATC2_EXT} from
+     * @gl_extension{EXT,texture_compression_latc}, only using the red and
+     * green channel instead of all four. **Available only on 2D, 2D array,
+     * cube map and cube map array textures.**
      * @requires_gl30 Extension @gl_extension{EXT,texture_compression_rgtc}
-     * @requires_gl RGTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_rgtc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_rgtc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedRGRgtc2 = GL_COMPRESSED_RG_RGTC2,
+    #else
+    CompressedRGRgtc2 = GL_COMPRESSED_RED_GREEN_RGTC2_EXT, /*?!*/
+    #endif
 
     /**
-     * RGTC compressed red channel, normalized signed. **Available only on 2D,
-     * 2D array, cube map and cube map array textures.**
+     * RGTC compressed red channel, normalized signed. Equivalent to the old
+     * @def_gl{COMPRESSED_SIGNED_LUMINANCE_LATC1_EXT} from
+     * @gl_extension{EXT,texture_compression_latc}, only using the red channel
+     * instead of all three. **Available only on 2D, 2D array, cube map and
+     * cube map array textures.**
      * @requires_gl30 Extension @gl_extension{EXT,texture_compression_rgtc}
-     * @requires_gl RGTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_rgtc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_rgtc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedSignedRedRgtc1 = GL_COMPRESSED_SIGNED_RED_RGTC1,
+    #else
+    CompressedSignedRedRgtc1 = GL_COMPRESSED_SIGNED_RED_RGTC1_EXT,
+    #endif
 
     /**
-     * RGTC compressed red and green channel, normalized signed. **Available
-     * only on 2D, 2D array, cube map and cube map array textures.**
+     * RGTC compressed red and green channel, normalized signed. Equivalent
+     * to the old @def_gl{COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2_EXT} from
+     * @gl_extension{EXT,texture_compression_latc}, only using the red and
+     * green channel instead of all four. **Available only on 2D, 2D array,
+     * cube map and cube map array textures.**
      * @requires_gl30 Extension @gl_extension{EXT,texture_compression_rgtc}
-     * @requires_gl RGTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_rgtc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_rgtc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedSignedRGRgtc2 = GL_COMPRESSED_SIGNED_RG_RGTC2,
+    #else
+    CompressedSignedRGRgtc2 = GL_COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT, /*?!*/
+    #endif
 
     /**
      * BPTC compressed RGB, unsigned float. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_gl42 Extension @gl_extension{ARB,texture_compression_bptc}
-     * @requires_gl BPTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_bptc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_bptc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedRGBBptcUnsignedFloat = GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT,
+    #else
+    CompressedRGBBptcUnsignedFloat = GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_EXT,
+    #endif
 
     /**
-     * BPTC compressed RGB, signed float. **Available only on 2D, 3D, 2D
-     * array, cube map and cube map array textures.**
+     * BPTC compressed RGB, signed float. **Available only on 2D, 3D, 2D array,
+     * cube map and cube map array textures.**
      * @requires_gl42 Extension @gl_extension{ARB,texture_compression_bptc}
-     * @requires_gl BPTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_bptc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_bptc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedRGBBptcSignedFloat = GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT,
+    #else
+    CompressedRGBBptcSignedFloat = GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_EXT,
+    #endif
 
     /**
      * BPTC compressed RGBA, normalized unsigned. **Available only on 2D, 3D,
      * 2D array, cube map and cube map array textures.**
      * @requires_gl42 Extension @gl_extension{ARB,texture_compression_bptc}
-     * @requires_gl BPTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_bptc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_bptc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedRGBABptcUnorm = GL_COMPRESSED_RGBA_BPTC_UNORM,
+    #else
+    CompressedRGBABptcUnorm = GL_COMPRESSED_RGBA_BPTC_UNORM_EXT,
+    #endif
 
     /**
      * BPTC compressed sRGBA, normalized unsigned. **Available only on 2D, 3D,
      * 2D array, cube map and cube map array textures.**
      * @requires_gl42 Extension @gl_extension{ARB,texture_compression_bptc}
-     * @requires_gl BPTC texture compression is not available in OpenGL ES or
-     *      WebGL.
+     * @requires_es_extension OpenGL ES 3.0 and extension
+     *      @gl_extension{EXT,texture_compression_bptc}
+     * @requires_webgl_extension Extension
+     *      @webgl_extension{EXT,texture_compression_bptc}. Unlike the OpenGL
+     *      ES variant, this extension doesn't require WebGL 2.
      */
+    #ifndef MAGNUM_TARGET_GLES
     CompressedSRGBAlphaBptcUnorm = GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM,
+    #else
+    CompressedSRGBAlphaBptcUnorm = GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT,
+    #endif
     #endif
 
     #ifndef MAGNUM_TARGET_GLES2
@@ -1191,430 +1294,995 @@ enum class TextureFormat: GLenum {
      * S3TC DXT1 compressed RGB. **Available only on 2D, 2D array, cube map and
      * cube map array textures.**
      * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
-     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     *      or @gl_extension{EXT,texture_compression_dxt1}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc},
+     *      @gl_extension{EXT,texture_compression_dxt1} or
+     *      @gl_extension2{ANGLE,texture_compression_dxt1,ANGLE_texture_compression_dxt}
      * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc}
      */
     CompressedRGBS3tcDxt1 = GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
 
     /**
+     * S3TC DXT1 compressed sRGB. **Available only for 2D, 2D array, cube map
+     * and cube map array textures.**
+     * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc_srgb}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc_srgb}
+     */
+    CompressedSRGBS3tcDxt1 = GL_COMPRESSED_SRGB_S3TC_DXT1_EXT,
+
+    /**
      * S3TC DXT1 compressed RGBA. **Available only on 2D, 2D array, cube map
      * and cube map array textures.**
      * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
-     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     *      or @gl_extension{EXT,texture_compression_dxt1}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc},
+     *      @gl_extension{EXT,texture_compression_dxt1} or
+     *      @gl_extension2{ANGLE,texture_compression_dxt1,ANGLE_texture_compression_dxt}
      * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc}
      */
     CompressedRGBAS3tcDxt1 = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,
+
+    /**
+     * S3TC DXT1 compressed sRGB + linear alpha. **Available only for 2D, 2D
+     * array, cube map and cube map array textures.**
+     * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc_srgb}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc_srgb}
+     */
+    CompressedSRGBAlphaS3tcDxt1 = GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT,
 
     /**
      * S3TC DXT3 compressed RGBA. **Available only on 2D, 2D array, cube map
      * and cube map array textures.**
      * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
      * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     *      or @gl_extension2{ANGLE,texture_compression_dxt3,ANGLE_texture_compression_dxt}
      * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc}
      */
     CompressedRGBAS3tcDxt3 = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT,
+
+    /**
+     * S3TC DXT3 compressed sRGB + linear alpha. **Available only for 2D, 2D
+     * array, cube map and cube map array textures.**
+     * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc_srgb}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc_srgb}
+     */
+    CompressedSRGBAlphaS3tcDxt3 = GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT,
 
     /**
      * S3TC DXT5 compressed RGBA. **Available only on 2D, 2D array, cube map
      * and cube map array textures.**
      * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
      * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     *      or @gl_extension2{ANGLE,texture_compression_dxt5,ANGLE_texture_compression_dxt}
      * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc}
      */
     CompressedRGBAS3tcDxt5 = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT,
 
-    #ifndef MAGNUM_TARGET_WEBGL
+    /**
+     * S3TC DXT5 compressed sRGB + linear alpha. **Available only for 2D, 2D
+     * array, cube map and cube map array textures.**
+     * @requires_extension Extension @gl_extension{EXT,texture_compression_s3tc}
+     * @requires_es_extension Extension @gl_extension{EXT,texture_compression_s3tc_srgb}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_s3tc_srgb}
+     */
+    CompressedSRGBAlphaS3tcDxt5 = GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
+
     /**
      * ASTC compressed RGBA with 4x4 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc4x4 = GL_COMPRESSED_RGBA_ASTC_4x4_KHR,
+    #else
+    CompressedRGBAAstc4x4 = GL_COMPRESSED_RGBA_ASTC_4x4,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 4x4 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc4x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc4x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4,
+    #endif
 
     /**
      * ASTC compressed RGBA with 5x4 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc5x4 = GL_COMPRESSED_RGBA_ASTC_5x4_KHR,
+    #else
+    CompressedRGBAAstc5x4 = GL_COMPRESSED_RGBA_ASTC_5x4,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 5x4 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc5x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc5x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4,
+    #endif
 
     /**
      * ASTC compressed RGBA with 5x5 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc5x5 = GL_COMPRESSED_RGBA_ASTC_5x5_KHR,
+    #else
+    CompressedRGBAAstc5x5 = GL_COMPRESSED_RGBA_ASTC_5x5,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 5x5 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc5x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc5x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5,
+    #endif
 
     /**
      * ASTC compressed RGBA with 6x5 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc6x5 = GL_COMPRESSED_RGBA_ASTC_6x5_KHR,
+    #else
+    CompressedRGBAAstc6x5 = GL_COMPRESSED_RGBA_ASTC_6x5,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 6x5 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc6x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc6x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5,
+    #endif
 
     /**
      * ASTC compressed RGBA with 6x6 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc6x6 = GL_COMPRESSED_RGBA_ASTC_6x6_KHR,
+    #else
+    CompressedRGBAAstc6x6 = GL_COMPRESSED_RGBA_ASTC_6x6,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 6x6 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc6x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc6x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6,
+    #endif
 
     /**
      * ASTC compressed RGBA with 8x5 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc8x5 = GL_COMPRESSED_RGBA_ASTC_8x5_KHR,
+    #else
+    CompressedRGBAAstc8x5 = GL_COMPRESSED_RGBA_ASTC_8x5,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 8x5 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc8x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc8x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5,
+    #endif
 
     /**
      * ASTC compressed RGBA with 8x6 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc8x6 = GL_COMPRESSED_RGBA_ASTC_8x6_KHR,
+    #else
+    CompressedRGBAAstc8x6 = GL_COMPRESSED_RGBA_ASTC_8x6,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 8x6 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc8x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc8x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6,
+    #endif
 
     /**
      * ASTC compressed RGBA with 8x8 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc8x8 = GL_COMPRESSED_RGBA_ASTC_8x8_KHR,
+    #else
+    CompressedRGBAAstc8x8 = GL_COMPRESSED_RGBA_ASTC_8x8,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 8x8 blocks. **Available only on 2D,
      * 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc8x8 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc8x8 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8,
+    #endif
 
     /**
      * ASTC compressed RGBA with 10x5 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc10x5 = GL_COMPRESSED_RGBA_ASTC_10x5_KHR,
+    #else
+    CompressedRGBAAstc10x5 = GL_COMPRESSED_RGBA_ASTC_10x5,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 10x5 blocks. **Available only on
      * 2D, 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc10x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc10x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5,
+    #endif
 
     /**
      * ASTC compressed RGBA with 10x6 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc10x6 = GL_COMPRESSED_RGBA_ASTC_10x6_KHR,
+    #else
+    CompressedRGBAAstc10x6 = GL_COMPRESSED_RGBA_ASTC_10x6,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 10x6 blocks. **Available only on
      * 2D, 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc10x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc10x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6,
+    #endif
 
     /**
      * ASTC compressed RGBA with 10x8 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc10x8 = GL_COMPRESSED_RGBA_ASTC_10x8_KHR,
+    #else
+    CompressedRGBAAstc10x8 = GL_COMPRESSED_RGBA_ASTC_10x8,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 10x8 blocks. **Available only on
      * 2D, 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc10x8 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc10x8 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8,
+    #endif
 
     /**
      * ASTC compressed RGBA with 10x10 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc10x10 = GL_COMPRESSED_RGBA_ASTC_10x10_KHR,
+    #else
+    CompressedRGBAAstc10x10 = GL_COMPRESSED_RGBA_ASTC_10x10,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 10x10 blocks. **Available only on
      * 2D, 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc10x10 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc10x10 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10,
+    #endif
 
     /**
      * ASTC compressed RGBA with 12x10 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc12x10 = GL_COMPRESSED_RGBA_ASTC_12x10_KHR,
+    #else
+    CompressedRGBAAstc12x10 = GL_COMPRESSED_RGBA_ASTC_12x10,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 12x10 blocks. **Available only on
      * 2D, 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc12x10 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc12x10 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10,
+    #endif
 
     /**
      * ASTC compressed RGBA with 12x12 blocks. **Available only on 2D, 3D, 2D
      * array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedRGBAAstc12x12 = GL_COMPRESSED_RGBA_ASTC_12x12_KHR,
+    #else
+    CompressedRGBAAstc12x12 = GL_COMPRESSED_RGBA_ASTC_12x12,
+    #endif
 
     /**
      * ASTC compressed sRGB with alpha with 12x12 blocks. **Available only on
      * 2D, 3D, 2D array, cube map and cube map array textures.**
      * @requires_extension Extension @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
      * @requires_gles32 Extension @gl_extension{ANDROID,extension_pack_es31a} /
      *      @gl_extension2{KHR,texture_compression_astc_ldr,KHR_texture_compression_astc_hdr}
+     * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_sliced_3d}
+     *      for 3D textures
      * @requires_es_extension Extension @gl_extension{KHR,texture_compression_astc_hdr}
      *      for 3D textures and HDR profile
-     * @requires_gles ASTC texture compression is not available in WebGL.
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_astc},
+     *      2D and cube map textures only
      */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2) || defined(MAGNUM_TARGET_WEBGL)
     CompressedSRGB8Alpha8Astc12x12 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR,
+    #else
+    CompressedSRGB8Alpha8Astc12x12 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12,
+    #endif
+
+    #if defined(DOXYGEN_GENERATING_OUTPUT) || (defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL))
+    /**
+     * 3D ASTC compressed RGBA with 3x3x3 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc3x3x3 = GL_COMPRESSED_RGBA_ASTC_3x3x3_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 3x3x3 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc3x3x3 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_3x3x3_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 4x3x3 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc4x3x3 = GL_COMPRESSED_RGBA_ASTC_4x3x3_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 4x3x3 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc4x3x3 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x3x3_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 4x4x3 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc4x4x3 = GL_COMPRESSED_RGBA_ASTC_4x4x3_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 4x4x3 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc4x4x3 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x3_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 4x4x4 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc4x4x4 = GL_COMPRESSED_RGBA_ASTC_4x4x4_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 4x4x4 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc4x4x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x4_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 5x4x4 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc5x4x4 = GL_COMPRESSED_RGBA_ASTC_5x4x4_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 5x4x4 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc5x4x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4x4_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 5x5x4 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc5x5x4 = GL_COMPRESSED_RGBA_ASTC_5x5x4_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 5x5x4 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc5x5x4 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x4_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 5x5x5 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc5x5x5 = GL_COMPRESSED_RGBA_ASTC_5x5x5_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 5x5x5 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc5x5x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x5_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 6x5x5 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc6x5x5 = GL_COMPRESSED_RGBA_ASTC_6x5x5_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 6x5x5 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc6x5x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5x5_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 6x6x5 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc6x6x5 = GL_COMPRESSED_RGBA_ASTC_6x6x5_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 6x6x5 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc6x6x5 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x5_OES,
+
+    /**
+     * 3D ASTC compressed RGBA with 6x6x6 blocks. **Available only on 3D
+     * textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedRGBAAstc6x6x6 = GL_COMPRESSED_RGBA_ASTC_6x6x6_OES,
+
+    /**
+     * 3D ASTC compressed sRGB with alpha with 6x6x6 blocks. **Available only
+     * on 3D textures.**
+     *
+     * @requires_gles30 Not defined on desktop OpenGL, WebGL or OpenGL ES 2.0.
+     * @requires_es_extension Extension @gl_extension{OES,texture_compression_astc}
+     */
+    CompressedSRGB8Alpha8Astc6x6x6 = GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x6_OES,
+    #endif
+
+    #if defined(DOXYGEN_GENERATING_OUTPUT) || defined(MAGNUM_TARGET_GLES)
+    /**
+     * PVRTC compressed RGB, normalized unsigned byte with 2 bits per pixel.
+     * **Available only on 2D, 3D, 2D array, cube map and cube map array
+     * textures.**
+     * @requires_gles Not available on desktop OpenGL.
+     * @requires_es_extension Extension @gl_extension{IMG,texture_compression_pvrtc}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_pvrtc}
+     */
+    CompressedRGBPvrtc2bppV1 = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG,
+
+    #ifndef MAGNUM_TARGET_WEBGL
+    /**
+     * PVRTC compressed sRGB, normalized unsigned byte with 2 bits per pixel.
+     * **Available only on 2D, 3D, 2D array, cube map and cube map array
+     * textures.**
+     * @requires_gles Not available on desktop OpenGL or WebGL.
+     * @requires_es_extension Extension @gl_extension{EXT,pvrtc_sRGB}
+     */
+    CompressedSRGBPvrtc2bppV1 = GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT,
+    #endif
+
+    /**
+     * PVRTC compressed RGBA, normalized unsigned byte with 2 bits per pixel.
+     * **Available only on 2D, 3D, 2D array, cube map and cube map array
+     * textures.**
+     * @requires_gles Not available on desktop OpenGL.
+     * @requires_es_extension Extension @gl_extension{IMG,texture_compression_pvrtc}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_pvrtc}
+     */
+    CompressedRGBAPvrtc2bppV1 = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG,
+
+    #ifndef MAGNUM_TARGET_WEBGL
+    /**
+     * PVRTC compressed sRGB + linear alpha, normalized unsigned byte with 2
+     * bits per pixel. **Available only on 2D, 3D, 2D array, cube map and cube
+     * map array textures.**
+     * @requires_gles Not available on desktop OpenGL or WebGL.
+     * @requires_es_extension Extension @gl_extension{EXT,pvrtc_sRGB}
+     */
+    CompressedSRGBAlphaPvrtc2bppV1 = GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT,
+    #endif
+
+    /**
+     * PVRTC compressed RGB, normalized unsigned byte with 4 bits per pixel.
+     * **Available only on 2D, 3D, 2D array, cube map and cube map array
+     * textures.**
+     * @requires_gles Not available on desktop OpenGL.
+     * @requires_es_extension Extension @gl_extension{IMG,texture_compression_pvrtc}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_pvrtc}
+     */
+    CompressedRGBPvrtc4bppV1 = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG,
+
+    #ifndef MAGNUM_TARGET_WEBGL
+    /**
+     * PVRTC compressed sRGB, normalized unsigned byte with 4 bits per pixel.
+     * **Available only on 2D, 3D, 2D array, cube map and cube map array
+     * textures.**
+     * @requires_gles Not available on desktop OpenGL or WebGL.
+     * @requires_es_extension Extension @gl_extension{EXT,pvrtc_sRGB}
+     */
+    CompressedSRGBPvrtc4bppV1 = GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT,
+    #endif
+
+    /**
+     * PVRTC compressed RGBA, normalized unsigned byte with 4 bits per pixel.
+     * **Available only on 2D, 3D, 2D array, cube map and cube map array
+     * textures.**
+     * @requires_gles Not available on desktop OpenGL.
+     * @requires_es_extension Extension @gl_extension{IMG,texture_compression_pvrtc}
+     * @requires_webgl_extension Extension @webgl_extension{WEBGL,compressed_texture_pvrtc}
+     */
+    CompressedRGBAPvrtc4bppV1 = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG,
+
+    #ifndef MAGNUM_TARGET_WEBGL
+    /**
+     * PVRTC compressed sRGB + linear alpha, normalized unsigned byte with 4
+     * bits per pixel. **Available only on 2D, 3D, 2D array, cube map and cube
+     * map array textures.**
+     * @requires_gles Not available on desktop OpenGL or WebGL.
+     * @requires_es_extension Extension @gl_extension{EXT,pvrtc_sRGB}
+     */
+    CompressedSRGBAlphaPvrtc4bppV1 = GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT,
+    #endif
+
+    /* PVRTC2 variants not listed as PVRTC is mainly on Apple hardware but
+       Metal doesn't support it and it doesn't have a WebGL equiv either. */
     #endif
 
     /**
@@ -1756,6 +2424,96 @@ enum class TextureFormat: GLenum {
     Depth32FStencil8 = GL_DEPTH32F_STENCIL8
     #endif
 };
+
+/**
+@brief Check availability of a sized generic texture format
+
+Some OpenGL targets don't support sized texture formats at all (OpenGL ES 2.0
+and WebGL 1.0), some targets miss some variants (for example OpenGL ES doesn't
+have any 8-bit packed formats) Returns @cpp false @ce if current target can't
+support such format, @cpp true @ce otherwise. Expects
+@ref isPixelFormatImplementationSpecific() returns @cpp false @ce for given
+@p format as OpenGL pixel format enum values usually can't be used to specify
+internal texture format as well.
+
+For OpenGL ES 2.0 (and WebGL 1.0) targets in particular the mapping is very
+complex and instead of using this function it's recommend to do the mapping
+manually based on whether @ref Texture::setImage() or
+@ref Texture::setStorage() is used and whether @gl_extension{EXT,texture_storage}
+and other format-specific extensions are supported.
+
+@note Support of some formats depends on presence of a particular OpenGL
+    extension. Such check is outside of the scope of this function and you are
+    expected to verify extension availability before using such format.
+
+@see @ref textureFormat(), @ref hasPixelFormat(),
+    @ref hasCompressedPixelFormat()
+*/
+MAGNUM_GL_EXPORT bool hasTextureFormat(Magnum::PixelFormat format);
+
+/**
+@brief Convert a generic pixel format to sized OpenGL texture format
+
+Not all sized texture formats may be available on all targets and this function
+expects that given format is available on the target. See @ref hasTextureFormat()
+for more information about checking availability of given format. Expects
+@ref isPixelFormatImplementationSpecific() returns @cpp false @ce for given
+@p format as OpenGL pixel format enum values usually can't be used to specify
+internal texture format as well.
+
+For OpenGL ES 2.0 (and WebGL 1.0) targets in particular the mapping is very
+complex and instead of using this function it's recommend to do the mapping
+manually based on whether @ref Texture::setImage() or
+@ref Texture::setStorage() is used and whether @gl_extension{EXT,texture_storage}
+and other format-specific extensions are supported.
+
+@see @ref pixelType(), @ref compressedPixelFormat()
+*/
+MAGNUM_GL_EXPORT TextureFormat textureFormat(Magnum::PixelFormat format);
+
+/**
+@brief Check availability of a generic compressed texture format
+
+Some OpenGL targets don't support all generic pixel formats (for example PVRTC
+compression might not be available on desktop OpenGL). Returns @cpp false @ce
+if current target can't support such format, @cpp true @ce otherwise. Moreover,
+returns @cpp true @ce also for all formats that are
+@ref isCompressedPixelFormatImplementationSpecific(). The @p format value is
+expected to be valid. This is different from
+@ref hasTextureFormat(Magnum::PixelFormat), where the mapping of an
+implementation-specific pixel format to an OpenGL texture format can't be
+performed.
+
+@note Support of some formats depends on presence of a particular OpenGL
+    extension. Such check is outside of the scope of this function and you are
+    expected to verify extension availability before using such format.
+
+@see @ref textureFormat(), @ref hasCompressedPixelFormat(),
+    @ref hasPixelFormat()
+*/
+MAGNUM_GL_EXPORT bool hasTextureFormat(Magnum::CompressedPixelFormat format);
+
+/**
+@brief Convert generic compressed pixel format to OpenGL texture format
+
+In case @ref isCompressedPixelFormatImplementationSpecific() returns
+@cpp false @ce for @p format, maps it to a corresponding OpenGL pixel format.
+In case @ref isCompressedPixelFormatImplementationSpecific() returns
+@cpp true @ce, assumes @p format stores OpenGL-specific pixel format and
+returns @ref compressedPixelFormatUnwrap() cast to @ref GL::TextureFormat. This
+is different from @ref textureFormat(Magnum::PixelFormat), where the mapping of
+an implementation-specific pixel format to an OpenGL texture format can't be
+performed.
+
+Not all generic pixel formats may be available on all targets and this function
+expects that given format is available on the target. Use @ref hasTextureFormat()
+to query availability of given format.
+@see @ref compressedPixelFormat(), @ref pixelFormat()
+*/
+MAGNUM_GL_EXPORT TextureFormat textureFormat(Magnum::CompressedPixelFormat format);
+
+/** @debugoperatorenum{TextureFormat} */
+MAGNUM_GL_EXPORT Debug& operator<<(Debug& debug, TextureFormat value);
 
 }}
 

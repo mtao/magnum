@@ -30,7 +30,13 @@
 namespace Magnum { namespace Platform { namespace Test { namespace {
 
 struct GlfwApplicationTest: Platform::Application {
-    explicit GlfwApplicationTest(const Arguments& arguments): Platform::Application{arguments} {}
+    explicit GlfwApplicationTest(const Arguments& arguments): Platform::Application{arguments} {
+        Debug{} << "window size" << windowSize()
+            #ifdef MAGNUM_TARGET_GL
+            << framebufferSize()
+            #endif
+            << dpiScaling();
+    }
 
     /* For testing HiDPI resize events */
     void viewportEvent(ViewportEvent& event) override {
@@ -52,7 +58,14 @@ struct GlfwApplicationTest: Platform::Application {
         } else if(event.key() == KeyEvent::Key::Esc) {
             Debug{} << "stopping text input";
             stopTextInput();
+        } else if(event.key() == KeyEvent::Key::T) {
+            Debug{} << "setting window title";
+            setWindowTitle("This is a UTF-8 Window Title™!");
         }
+    }
+
+    void mouseMoveEvent(MouseMoveEvent& event) override {
+        Debug{} << "mouse move event:" << event.position() << event.relativePosition() << UnsignedInt(event.buttons());
     }
 
     void textInputEvent(TextInputEvent& event) override {

@@ -54,8 +54,8 @@ This class is designed to be used via subclassing. Subclasses define these
 functions and properties:
 
 <ul>
-<li> **Attribute definitions** with location and type for
-    configuring meshes, for example:
+<li> **Attribute definitions** using @ref Attribute typedefs with location and
+    type for configuring meshes, for example:
 
     @snippet MagnumGL.cpp AbstractShaderProgram-input-attributes
 </li>
@@ -88,7 +88,7 @@ functions and properties:
     @snippet MagnumGL.cpp AbstractShaderProgram-xfb
 </li></ul>
 
-@subsection GL-AbstractShaderProgram-attribute-location Binding attribute location
+@subsection GL-AbstractShaderProgram-attribute-location Binding attribute and fragment data location
 
 The preferred workflow is to specify attribute location for vertex shader input
 attributes and fragment shader output attributes explicitly in the shader code,
@@ -796,7 +796,7 @@ class MAGNUM_GL_EXPORT AbstractShaderProgram: public AbstractObject {
         #endif
 
         /**
-         * @brief Attach shader
+         * @brief Attach a shader
          *
          * @see @fn_gl_keyword{AttachShader}
          */
@@ -812,7 +812,7 @@ class MAGNUM_GL_EXPORT AbstractShaderProgram: public AbstractObject {
         void attachShaders(std::initializer_list<Containers::Reference<Shader>> shaders);
 
         /**
-         * @brief Bind attribute to given location
+         * @brief Bind an attribute to given location
          * @param location      Location
          * @param name          Attribute name
          *
@@ -1132,8 +1132,10 @@ class MAGNUM_GL_EXPORT AbstractShaderProgram: public AbstractObject {
         #endif
 
         void bindAttributeLocationInternal(UnsignedInt location, Containers::ArrayView<const char> name);
+        #ifndef MAGNUM_TARGET_GLES
         void bindFragmentDataLocationIndexedInternal(UnsignedInt location, UnsignedInt index, Containers::ArrayView<const char> name);
         void bindFragmentDataLocationInternal(UnsignedInt location, Containers::ArrayView<const char> name);
+        #endif
         Int uniformLocationInternal(Containers::ArrayView<const char> name);
         UnsignedInt uniformBlockIndexInternal(Containers::ArrayView<const char> name);
 

@@ -122,6 +122,10 @@ option(WITH_EGLCONTEXT "Build EglContext library" OFF)
 if(CORRADE_TARGET_ANDROID)
     option(WITH_ANDROIDAPPLICATION "Build AndroidApplication library" OFF)
 
+# Emscripten-specific application libraries
+elseif(CORRADE_TARGET_EMSCRIPTEN)
+    option(WITH_EMSCRIPTENAPPLICATION "Build EmscriptenApplication library" OFF)
+
 # iOS-specific application libraries
 elseif(CORRADE_TARGET_IOS)
     option(WITH_WINDOWLESSIOSAPPLICATION "Build WindowlessIosApplication library" OFF)
@@ -161,9 +165,16 @@ if(BUILD_DEPRECATED)
     set(MAGNUM_BUILD_DEPRECATED 1)
 endif()
 
-option(BUILD_MULTITHREADED "Build in a way that makes it possible to use multiple thread-local Magnum contexts" ON)
-if(BUILD_MULTITHREADED)
-    set(MAGNUM_BUILD_MULTITHREADED 1)
+# BUILD_MULTITHREADED got moved to Corrade itself. In case we're building with
+# deprecated features enabled, print a warning in case it's set but Corrade
+# reports a different value. We can't print a warning in case it's set because
+# that would cause false positives when both Corrade and Magnum are subprojects
+# (and thus this option is visible to both). Otherwise it's silent --- for
+# non-deprecated builds CMake will at most warn about "variable being unused".
+if(MAGNUM_BUILD_DEPRECATED)
+    if(DEFINED BUILD_MULTITHREADED AND ((NOT CORRADE_BUILD_MULTITHREADED AND BUILD_MULTITHREADED) OR (CORRADE_BUILD_MULTITHREADED AND NOT BUILD_MULTITHREADED)))
+        message(DEPRECATION "BUILD_MULTITHREADED (set to ${BUILD_MULTITHREADED}) is now ignored — you need to set it when building Corrade instead (there it's ${CORRADE_BUILD_MULTITHREADED} now)")
+    endif()
 endif()
 
 set(MAGNUM_DEPLOY_PREFIX "."
@@ -172,7 +183,15 @@ set(MAGNUM_INCLUDE_INSTALL_PREFIX "."
     CACHE STRING "Prefix where to put platform-independent include and other files")
 
 option(BUILD_STATIC "Build static libraries (default are shared)" OFF)
-option(BUILD_STATIC_PIC "Build static libraries and plugins with position-independent code" ON)
+# Disable PIC on Emscripten by default (but still allow it to be enabled
+# explicitly if one so desires). Currently causes linker errors related to
+# __memory_base etc.: https://github.com/emscripten-core/emscripten/issues/8761
+if(CORRADE_TARGET_EMSCRIPTEN)
+    set(ON_EXCEPT_EMSCRIPTEN OFF)
+else()
+    set(ON_EXCEPT_EMSCRIPTEN ON)
+endif()
+option(BUILD_STATIC_PIC "Build static libraries and plugins with position-independent code" ${ON_EXCEPT_EMSCRIPTEN})
 option(BUILD_PLUGINS_STATIC "Build static plugins (default are dynamic)" OFF)
 option(BUILD_TESTS "Build unit tests" OFF)
 cmake_dependent_option(BUILD_GL_TESTS "Build unit tests for OpenGL code" OFF "BUILD_TESTS;TARGET_GL" OFF)

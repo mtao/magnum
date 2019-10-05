@@ -52,6 +52,8 @@ namespace Magnum { namespace Platform {
 /**
 @brief Windowless EGL context
 
+@m_keywords{WindowlessGLContext}
+
 GL context using EGL without any windowing system, used in
 @ref WindowlessEglApplication. Does not have any default framebuffer. It is
 built if `WITH_WINDOWLESSEGLAPPLICATION` is enabled in CMake.
@@ -142,7 +144,7 @@ class WindowlessEglContext::Configuration {
         /**
          * @brief Context flag
          *
-         * @see @ref Flags, @ref setFlags(), @ref Context::Flag
+         * @see @ref Flags, @ref setFlags(), @ref GL::Context::Flag
          * @requires_gles Context flags are not available in WebGL.
          */
         enum class Flag: int {
@@ -156,7 +158,12 @@ class WindowlessEglContext::Configuration {
             ForwardCompatible = EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE_BIT_KHR,
             #endif
 
-            Debug = EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR    /**< Create debug context */
+            /**
+             * Debug context. Enabled automatically if the
+             * `--magnum-gpu-validation` @ref GL-Context-command-line "command-line option"
+             * is present.
+             */
+            Debug = EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR
         };
 
         /**
@@ -241,6 +248,8 @@ CORRADE_ENUMSET_OPERATORS(WindowlessEglContext::Configuration::Flags)
 
 /**
 @brief Windowless EGL application
+
+@m_keywords{WindowlessApplication}
 
 Application for offscreen rendering using @ref WindowlessEglContext. This
 application library is in theory available for all platforms for which EGL
@@ -340,6 +349,15 @@ MAGNUM_WINDOWLESSEGLAPPLICATION_MAIN(MyApplication)
 If no other application header is included, this class is also aliased to
 @cpp Platform::WindowlessApplication @ce and the macro is aliased to
 @cpp MAGNUM_WINDOWLESSAPPLICATION_MAIN() @ce to simplify porting.
+
+@subsection Platform-WindowlessEglApplication-usage-device-enumeration EGL device enumeration
+
+The application prefers to use the @m_class{m-doc-external}
+[EGL_EXT_device_enumeration](https://www.khronos.org/registry/EGL/extensions/EXT/EGL_EXT_device_enumeration.txt),
+@m_class{m-doc-external} [EGL_EXT_platform_base](https://www.khronos.org/registry/EGL/extensions/EXT/EGL_EXT_platform_base.txt) and
+@m_class{m-doc-external} [EGL_EXT_platform_device](https://www.khronos.org/registry/EGL/extensions/EXT/EGL_EXT_platform_device.txt)
+where available instead of `EGL_DEFAULT_DISPLAY` to work better on headless
+setups. The application always chooses the first found device.
 */
 class WindowlessEglApplication {
     public:

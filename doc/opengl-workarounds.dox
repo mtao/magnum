@@ -27,8 +27,6 @@ namespace Magnum {
 /** @page opengl-workarounds Driver workarounds
 @brief List of OpenGL driver workarounds used by Magnum
 
-@m_keyword{OpenGL driver workarounds,,}
-
 @m_footernavigation
 
 Driver workarounds used by a particular app are listed in the engine startup
@@ -52,6 +50,8 @@ These identifiers correspond to the strings in the below listing. For debugging
 and diagnostic purpose it's possible to disable particular workarounds by
 passing their identifier string to the `--magnum-disable-workarounds`
 command-line option. See @ref GL-Context-command-line for more information.
+
+@m_class{m-console-wrap}
 
 @snippet src/Magnum/GL/Implementation/driverSpecific.cpp workarounds
 

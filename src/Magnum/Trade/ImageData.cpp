@@ -27,8 +27,9 @@
 
 #include <Corrade/Containers/StridedArrayView.h>
 
+#include "Magnum/ImageView.h"
 #include "Magnum/PixelFormat.h"
-#include "Magnum/Implementation/ImagePixelView.h"
+#include "Magnum/Implementation/ImageProperties.h"
 
 namespace Magnum { namespace Trade {
 
@@ -44,8 +45,42 @@ template<UnsignedInt dimensions> ImageData<dimensions>::ImageData(const Compress
 
 template<UnsignedInt dimensions> ImageData<dimensions>::ImageData(const CompressedPixelStorage storage, const UnsignedInt format, const VectorTypeFor<dimensions, Int>& size, Containers::Array<char>&& data, const void* const importerState) noexcept: ImageData{storage, compressedPixelFormatWrap(format), size, std::move(data), importerState} {}
 
+template<UnsignedInt dimensions> ImageData<dimensions>::ImageData(ImageData<dimensions>&& other) noexcept: _compressed{std::move(other._compressed)}, _size{std::move(other._size)}, _data{std::move(other._data)}, _importerState{std::move(other._importerState)} {
+    if(_compressed) {
+        new(&_compressedStorage) CompressedPixelStorage{std::move(other._compressedStorage)};
+        _compressedFormat = std::move(other._compressedFormat);
+    }
+    else {
+        new(&_storage) PixelStorage{std::move(other._storage)};
+        _format = std::move(other._format);
+        _formatExtra = std::move(other._formatExtra);
+        _pixelSize = std::move(other._pixelSize);
+    }
+
+    other._size = {};
+}
+
 template<UnsignedInt dimensions> ImageData<dimensions>::ImageData(ImageData<dimensions>&& other, const void* const importerState) noexcept: ImageData{std::move(other)} {
     _importerState = importerState;
+}
+
+template<UnsignedInt dimensions> ImageData<dimensions>& ImageData<dimensions>::operator=(ImageData<dimensions>&& other) noexcept {
+    using std::swap;
+    swap(_compressed, other._compressed);
+    if(_compressed) {
+        swap(_compressedStorage, other._compressedStorage);
+        swap(_compressedFormat, other._compressedFormat);
+    }
+    else {
+        swap(_storage, other._storage);
+        swap(_format, other._format);
+    }
+    swap(_formatExtra, other._formatExtra);
+    swap(_pixelSize, other._pixelSize);
+    swap(_size, other._size);
+    swap(_data, other._data);
+    swap(_importerState, other._importerState);
+    return *this;
 }
 
 template<UnsignedInt dimensions> PixelStorage ImageData<dimensions>::storage() const {
@@ -93,18 +128,34 @@ template<UnsignedInt dimensions> Containers::StridedArrayView<dimensions + 1, co
     return Implementation::imagePixelView<dimensions, const char>(*this);
 }
 
-template<UnsignedInt dimensions> ImageData<dimensions>::operator ImageView<dimensions>() const
-{
-    CORRADE_ASSERT(!_compressed, "Trade::ImageData::type(): the image is compressed", (ImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size}));
-    return ImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size, _data};
+template<UnsignedInt dimensions> ImageData<dimensions>::operator BasicMutableImageView<dimensions>() {
+    CORRADE_ASSERT(!_compressed, "Trade::ImageData: the image is compressed", (BasicMutableImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size}));
+    return BasicMutableImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size, _data};
 }
 
-template<UnsignedInt dimensions> ImageData<dimensions>::operator CompressedImageView<dimensions>() const
-{
-    CORRADE_ASSERT(_compressed, "Trade::ImageData::type(): the image is not compressed", (CompressedImageView<dimensions>{_compressedStorage, _compressedFormat, _size}));
-    return CompressedImageView<dimensions>{
+template<UnsignedInt dimensions> ImageData<dimensions>::operator BasicImageView<dimensions>() const {
+    CORRADE_ASSERT(!_compressed, "Trade::ImageData: the image is compressed", (BasicImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size}));
+    return BasicImageView<dimensions>{_storage, _format, _formatExtra, _pixelSize, _size, _data};
+}
+
+template<UnsignedInt dimensions> ImageData<dimensions>::operator BasicMutableCompressedImageView<dimensions>() {
+    CORRADE_ASSERT(_compressed, "Trade::ImageData: the image is not compressed", (BasicMutableCompressedImageView<dimensions>{_compressedStorage, _compressedFormat, _size}));
+    return BasicMutableCompressedImageView<dimensions>{
         _compressedStorage,
         _compressedFormat, _size, _data};
+}
+
+template<UnsignedInt dimensions> ImageData<dimensions>::operator BasicCompressedImageView<dimensions>() const {
+    CORRADE_ASSERT(_compressed, "Trade::ImageData: the image is not compressed", (BasicCompressedImageView<dimensions>{_compressedStorage, _compressedFormat, _size}));
+    return BasicCompressedImageView<dimensions>{
+        _compressedStorage,
+        _compressedFormat, _size, _data};
+}
+
+template<UnsignedInt dimensions> Containers::Array<char> ImageData<dimensions>::release() {
+    Containers::Array<char> data{std::move(_data)};
+    _size = {};
+    return data;
 }
 
 #ifndef DOXYGEN_GENERATING_OUTPUT

@@ -31,6 +31,9 @@
 #include "Magnum/GL/Context.h"
 #include "Magnum/GL/Extensions.h"
 #include "Magnum/GL/Shader.h"
+#include "Magnum/Math/Color.h"
+#include "Magnum/Math/Matrix3.h"
+#include "Magnum/Math/Matrix4.h"
 
 #include "Magnum/Shaders/Implementation/CreateCompatibilityShader.h"
 
@@ -61,21 +64,23 @@ template<UnsignedInt dimensions> DistanceFieldVector<dimensions>::DistanceFieldV
 
     vert.addSource(rs.get("generic.glsl"))
         .addSource(rs.get(vertexShaderName<dimensions>()));
-    frag.addSource(rs.get("DistanceFieldVector.frag"));
+    frag.addSource(rs.get("generic.glsl"))
+        .addSource(rs.get("DistanceFieldVector.frag"));
 
     CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
 
     GL::AbstractShaderProgram::attachShaders({vert, frag});
 
+    /* ES3 has this done in the shader directly */
+    #if !defined(MAGNUM_TARGET_GLES) || defined(MAGNUM_TARGET_GLES2)
     #ifndef MAGNUM_TARGET_GLES
     if(!GL::Context::current().isExtensionSupported<GL::Extensions::ARB::explicit_attrib_location>(version))
-    #else
-    if(!GL::Context::current().isVersionSupported(GL::Version::GLES300))
     #endif
     {
         GL::AbstractShaderProgram::bindAttributeLocation(AbstractVector<dimensions>::Position::Location, "position");
         GL::AbstractShaderProgram::bindAttributeLocation(AbstractVector<dimensions>::TextureCoordinates::Location, "textureCoordinates");
     }
+    #endif
 
     CORRADE_INTERNAL_ASSERT_OUTPUT(GL::AbstractShaderProgram::link());
 
@@ -105,6 +110,31 @@ template<UnsignedInt dimensions> DistanceFieldVector<dimensions>::DistanceFieldV
     setOutlineRange(0.5f, 1.0f);
     setSmoothness(0.04f);
     #endif
+}
+
+template<UnsignedInt dimensions> DistanceFieldVector<dimensions>& DistanceFieldVector<dimensions>::setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix) {
+    GL::AbstractShaderProgram::setUniform(_transformationProjectionMatrixUniform, matrix);
+    return *this;
+}
+
+template<UnsignedInt dimensions> DistanceFieldVector<dimensions>& DistanceFieldVector<dimensions>::setColor(const Color4& color) {
+    GL::AbstractShaderProgram::setUniform(_colorUniform, color);
+    return *this;
+}
+
+template<UnsignedInt dimensions> DistanceFieldVector<dimensions>& DistanceFieldVector<dimensions>::setOutlineColor(const Color4& color) {
+    GL::AbstractShaderProgram::setUniform(_outlineColorUniform, color);
+    return *this;
+}
+
+template<UnsignedInt dimensions> DistanceFieldVector<dimensions>& DistanceFieldVector<dimensions>::setOutlineRange(Float start, Float end) {
+    GL::AbstractShaderProgram::setUniform(_outlineRangeUniform, Vector2(start, end));
+    return *this;
+}
+
+template<UnsignedInt dimensions> DistanceFieldVector<dimensions>& DistanceFieldVector<dimensions>::setSmoothness(Float value) {
+    GL::AbstractShaderProgram::setUniform(_smoothnessUniform, value);
+    return *this;
 }
 
 template class DistanceFieldVector<2>;

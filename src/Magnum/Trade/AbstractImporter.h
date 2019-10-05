@@ -244,11 +244,13 @@ class MAGNUM_TRADE_EXPORT AbstractImporter: public PluginManager::AbstractManagi
          * @brief Plugin search paths
          *
          * First looks in `magnum/importers/` or `magnum-d/importers/` next to
-         * the executable and as a fallback in `magnum/importers/` or
-         * `magnum-d/importers/` in the runtime install location (`lib[64]/` on
-         * Unix-like systems, `bin/` on Windows). The system-wide plugin search
-         * directory is configurable using the `MAGNUM_PLUGINS_DIR` CMake
-         * variables, see @ref building for more information.
+         * the executable (or, in case of Windows and a non-static build, next
+         * to the DLL of the @ref Trade library) and as a fallback in
+         * `magnum/importers/` or `magnum-d/importers/` in the runtime install
+         * location (`lib[64]/` on Unix-like systems, `bin/` on Windows). The
+         * system-wide plugin search directory is configurable using the
+         * `MAGNUM_PLUGINS_DIR` CMake variables, see @ref building for more
+         * information.
          *
          * Not defined on platforms without
          * @ref CORRADE_PLUGINMANAGER_NO_DYNAMIC_PLUGIN_SUPPORT "dynamic plugin support".
@@ -360,7 +362,8 @@ class MAGNUM_TRADE_EXPORT AbstractImporter: public PluginManager::AbstractManagi
          *
          * Closes previous file, if it was opened, and tries to open given raw
          * data. Available only if @ref Feature::OpenData is supported. Returns
-         * @cpp true @ce on success, @cpp false @ce otherwise.
+         * @cpp true @ce on success, @cpp false @ce otherwise. The @p data is
+         * not expected to be alive after the function exits.
          * @see @ref features(), @ref openFile()
          */
         bool openData(Containers::ArrayView<const char> data);
@@ -382,7 +385,7 @@ class MAGNUM_TRADE_EXPORT AbstractImporter: public PluginManager::AbstractManagi
         bool openState(const void* state, const std::string& filePath = {});
 
         /**
-         * @brief Open file
+         * @brief Open a file
          *
          * Closes previous file, if it was opened, and tries to open given
          * file. Returns @cpp true @ce on success, @cpp false @ce otherwise.
@@ -394,7 +397,13 @@ class MAGNUM_TRADE_EXPORT AbstractImporter: public PluginManager::AbstractManagi
          */
         bool openFile(const std::string& filename);
 
-        /** @brief Close file */
+        /**
+         * @brief Close currently opened file
+         *
+         * On particular implementations an explicit call to this function may
+         * result in freed memory. This call is also done automatically when
+         * the importer gets destructed or when another file is opened.
+         */
         void close();
 
         /** @{ @name Data accessors
